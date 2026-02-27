@@ -1,5 +1,3 @@
-"use server"
-
 import { generateText, Output } from "ai"
 import { z } from "zod"
 
@@ -74,8 +72,13 @@ async function getSwarmConsensus(
     )
     .join("\n")
 
+  // Use Groq for consensus if no gateway key, otherwise use GPT-4o-mini
+  const consensusModel = process.env.AI_GATEWAY_API_KEY 
+    ? "openai/gpt-4o-mini" 
+    : "groq/llama-3.3-70b-versatile"
+  
   const result = await generateText({
-    model: "openai/gpt-4o-mini",
+    model: consensusModel,
     system:
       "You synthesize multiple AI trading analyses into a final consensus. Be conservative.",
     prompt: `Given these analyses from different AI models, determine the final consensus:
@@ -101,10 +104,12 @@ export async function POST(req: Request) {
       return Response.json({ error: "Ticker is required" }, { status: 400 })
     }
 
-    // Models to use - Groq is free, OpenAI/Anthropic for quality
-    const models = useSwarm
+    // Models to use - Groq is free and primary, others optional for swarm consensus
+    // Only use multi-model if AI_GATEWAY_API_KEY is set (for OpenAI/Anthropic)
+    const hasGatewayKey = !!process.env.AI_GATEWAY_API_KEY
+    const models = useSwarm && hasGatewayKey
       ? ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini", "anthropic/claude-3-5-haiku-latest"]
-      : ["groq/llama-3.3-70b-versatile"]
+      : ["groq/llama-3.3-70b-versatile"] // Groq-only mode (free tier)
 
     // Run analyses in parallel
     const results = await Promise.all(
