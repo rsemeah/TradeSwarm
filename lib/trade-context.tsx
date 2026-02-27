@@ -16,6 +16,7 @@ interface TradeState {
   lastResult: {
     success: boolean
     message: string
+    reasonCode?: string
     data?: unknown
   } | null
   analysisInProgress: string | null // ticker being analyzed
@@ -63,6 +64,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         lastResult: {
           success: response.ok,
           message: data.message || data.error || "Trade executed",
+          reasonCode: data.reasonCode,
           data,
         },
       }))
@@ -100,6 +102,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         lastResult: {
           success: response.ok,
           message: data.message || data.error || "Simulation recorded",
+          reasonCode: data.reasonCode,
           data,
         },
       }))
@@ -137,6 +140,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         lastResult: {
           success: response.ok,
           message: data.message || `Added ${ticker} to watchlist`,
+          reasonCode: data.reasonCode,
           data,
         },
       }))
@@ -188,6 +192,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
           lastResult: {
             success: false,
             message: data.error || "Analysis failed",
+            reasonCode: data.reasonCode,
           },
         }))
         return null

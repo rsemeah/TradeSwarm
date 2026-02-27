@@ -2,6 +2,7 @@ import { generateText, Output } from "ai"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { runEngineAnalysis, preflightCheck } from "@/lib/engine"
+import { evaluateDegradedMode, recordStageEvent } from "@/lib/engine/events"
 
 // Schema for preview analysis
 const PreviewSchema = z.object({
@@ -16,56 +17,95 @@ const PreviewSchema = z.object({
     amount: z.string(),
   }),
   reasoning: z.string(),
-  // Regime data stub (will be enhanced later)
-  regime: z.object({
-    trend: z.enum(["bullish", "bearish", "neutral"]),
-    volatility: z.enum(["low", "medium", "high"]),
-    momentum: z.enum(["strong", "weak", "neutral"]),
-  }).nullable(),
-  // Risk data stub
-  risk: z.object({
-    maxLoss: z.number(),
-    expectedReturn: z.number(),
-    confidenceInterval: z.number(),
-  }).nullable(),
+  regime: z
+    .object({
+      trend: z.enum(["bullish", "bearish", "neutral"]),
+      volatility: z.enum(["low", "medium", "high"]),
+      momentum: z.enum(["strong", "weak", "neutral"]),
+    })
+    .nullable(),
+  risk: z
+    .object({
+      maxLoss: z.number(),
+      expectedReturn: z.number(),
+      confidenceInterval: z.number(),
+    })
+    .nullable(),
 })
 
 export async function POST(req: Request) {
+  const correlationId = crypto.randomUUID()
+
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 })
+      return Response.json({ error: "Unauthorized", reasonCode: "UNAUTHORIZED", correlationId }, { status: 401 })
     }
 
+    const contextStart = Date.now()
     const { ticker, theme, marketContext } = await req.json()
 
     if (!ticker) {
-      return Response.json({ error: "Ticker is required" }, { status: 400 })
+      return Response.json({ error: "Ticker is required", reasonCode: "MISSING_TICKER", correlationId }, { status: 400 })
     }
 
-    // Get user preferences for position sizing
-    const { data: preferences } = await supabase
-      .from("user_preferences")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
+    await recordStageEvent(supabase, {
+      stage: "CONTEXT_DONE",
+      status: "success",
+      correlationId,
+      userId: user.id,
+      ticker,
+      durationMs: Date.now() - contextStart,
+    })
 
-    const { data: portfolioStats } = await supabase
-      .from("portfolio_stats")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
+    const { data: preferences } = await supabase.from("user_preferences").select("*").eq("user_id", user.id).single()
+
+    const { data: portfolioStats } = await supabase.from("portfolio_stats").select("*").eq("user_id", user.id).single()
 
     const balance = portfolioStats?.balance || 10000
     const safetyMode = preferences?.safety_mode || "training_wheels"
-    const estimatedAmount = balance * 0.015 // 1.5% position for preview
+    const estimatedAmount = balance * 0.015
 
-    // Run engine analysis (regime + risk)
+    const degradeReasons: string[] = []
+
+    const regimeStart = Date.now()
     const engineAnalysis = await runEngineAnalysis(ticker, estimatedAmount, balance, 50)
+    const regimeStatus = engineAnalysis.regime.confidence < 0.5 ? "degraded" : "success"
+    if (regimeStatus === "degraded") {
+      degradeReasons.push("REGIME_FAILED")
+    }
+    await recordStageEvent(supabase, {
+      stage: "REGIME_DONE",
+      status: regimeStatus,
+      correlationId,
+      userId: user.id,
+      ticker,
+      durationMs: Date.now() - regimeStart,
+      reasonCode: regimeStatus === "degraded" ? "REGIME_FAILED" : undefined,
+      details: { confidence: engineAnalysis.regime.confidence },
+    })
 
-    // Run AI analysis with Groq (fast preview) - now with engine context
+    const riskStart = Date.now()
+    const riskStatus = engineAnalysis.risk.maxLoss <= 0 ? "degraded" : "success"
+    if (riskStatus === "degraded") {
+      degradeReasons.push("RISK_FAILED")
+    }
+    await recordStageEvent(supabase, {
+      stage: "RISK_DONE",
+      status: riskStatus,
+      correlationId,
+      userId: user.id,
+      ticker,
+      durationMs: Date.now() - riskStart,
+      reasonCode: riskStatus === "degraded" ? "RISK_FAILED" : undefined,
+      details: { riskLevel: engineAnalysis.risk.riskLevel },
+    })
+
+    const round1Start = Date.now()
     const result = await generateText({
       model: "groq/llama-3.3-70b-versatile",
       system: `You are a trading analyst AI for TradeSwarm. Analyze options trade setups focusing on risk management.
@@ -86,23 +126,51 @@ Provide rapid assessment with status, trust score, bullets, and position sizing.
       output: Output.object({ schema: PreviewSchema }),
     })
 
-    const preview = result.output
+    await recordStageEvent(supabase, {
+      stage: "ROUND1_DONE",
+      status: "success",
+      correlationId,
+      userId: user.id,
+      ticker,
+      durationMs: Date.now() - round1Start,
+    })
 
-    // Run preflight check
+    const preview = result.output
     const preflight = preview ? preflightCheck(engineAnalysis.regime, engineAnalysis.risk, preview.trustScore) : null
 
-    // Apply safety mode position limits
     if (safetyMode === "training_wheels" && preview?.recommendedAmount) {
       preview.recommendedAmount = Math.min(preview.recommendedAmount, balance * 0.015)
     }
 
+    const scoringStart = Date.now()
+    const degradedMode = evaluateDegradedMode(degradeReasons)
+    await recordStageEvent(supabase, {
+      stage: "SCORING_DONE",
+      status: degradedMode.isDegraded ? "degraded" : "success",
+      correlationId,
+      userId: user.id,
+      ticker,
+      durationMs: Date.now() - scoringStart,
+      reasonCode: degradedMode.reasonCode || undefined,
+      details: { previewStatus: preview?.status, trustScore: preview?.trustScore },
+    })
+
     return Response.json({
       success: true,
+      correlationId,
+      reasonCode: degradedMode.reasonCode,
       preview,
       engine: {
         regime: engineAnalysis.regime,
         risk: engineAnalysis.risk,
         preflight,
+      },
+      degradedMode: {
+        ...degradedMode,
+        policy: {
+          preview: "allowed_with_warnings",
+          execute: degradedMode.executeBlocked ? "fail_closed" : "allowed",
+        },
       },
       meta: {
         balance,
@@ -113,6 +181,6 @@ Provide rapid assessment with status, trust score, bullets, and position sizing.
     })
   } catch (error) {
     console.error("Preview error:", error)
-    return Response.json({ error: String(error) }, { status: 500 })
+    return Response.json({ error: String(error), reasonCode: "PREVIEW_FAILED", correlationId }, { status: 500 })
   }
 }
