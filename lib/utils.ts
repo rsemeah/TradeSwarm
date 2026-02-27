@@ -5,15 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function getScoreColor(score: number): string {
-  if (score > 0.6) return "#00ff88"
-  if (score >= 0.4) return "#ffcc00"
-  return "#ff4444"
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  }).format(amount)
 }
 
-export function getDrawdownColor(current: number, max: number): string {
-  const percentage = (current / max) * 100
-  if (percentage < 53) return "#00ff88" // < 8% of 15%
-  if (percentage < 80) return "#ffcc00" // 8-12% of 15%
+export function getStatusColor(status: "GO" | "WAIT" | "NO"): string {
+  switch (status) {
+    case "GO":
+      return "#00ff88"
+    case "WAIT":
+      return "#ffcc00"
+    case "NO":
+      return "#ff4444"
+  }
+}
+
+export function getTrustScoreColor(score: number): string {
+  if (score >= 60) return "#00ff88"
+  if (score >= 40) return "#ffcc00"
   return "#ff4444"
 }

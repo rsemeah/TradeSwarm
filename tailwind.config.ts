@@ -22,10 +22,10 @@ const config: Config = {
           foreground: "#6b6b6b",
         },
         accent: {
-          green: "#00ff88",
-          yellow: "#ffcc00",
-          red: "#ff4444",
+          DEFAULT: "#00ff88",
         },
+        warning: "#ffcc00",
+        danger: "#ff4444",
         primary: {
           DEFAULT: "#00ff88",
           foreground: "#0a0a0a",
@@ -36,12 +36,14 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["system-ui", "sans-serif"],
-        mono: ["ui-monospace", "SFMono-Regular", "monospace"],
+        sans: ["system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "SF Mono", "Menlo", "monospace"],
       },
       borderRadius: {
-        card: "8px",
-        badge: "4px",
+        DEFAULT: "10px",
+      },
+      maxWidth: {
+        phone: "420px",
       },
     },
   },

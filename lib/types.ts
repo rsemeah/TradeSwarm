@@ -1,85 +1,72 @@
-export type CandidateStatus = "FIRE" | "WATCH" | "BLOCK"
-export type RegimeStatus = "PASS" | "BLOCK"
-export type ImpactLevel = "Low" | "Medium" | "High"
-
-export interface GateResult {
-  label: string
-  passed: boolean
+// Theme types for Radar screen
+export interface Theme {
+  name: string
+  heat: "hot" | "warming" | "quiet"
+  tickers: string[]
+  brief: string
 }
 
-export interface AuditData {
-  costModel: {
-    grossELR: string
-    tcaDeduction: string
-    netELR: string
-  }
-  popEstimate: {
-    deltaProxy: string
-    bucketHits: string
-    ciLower: string
-    confidence: string
-  }
-  kellySizing: {
-    kellyRaw: string
-    halfKelly: string
-    finalCapped: string
-    dollarRisk: string
-  }
-  gateResults: GateResult[]
-  timestamp: string
+// Trade candidate types
+export interface TradeBullets {
+  why: string
+  risk: string
+  amount: string
+}
+
+export interface AuditSimple {
+  trustScore: number
+  winLikelihood: string
+  marketStability: string
+  fillQuality: string
+  recommended: string
+  decision: string
+}
+
+export interface AuditAdvanced {
+  growthScore: number
+  netElr: string
+  popLowerBound: string
+  kellyFinal: string
+  regimeScore: number
+  liquidityScore: number
+  gates: {
+    name: string
+    passed: boolean
+  }[]
 }
 
 export interface TradeCandidate {
   ticker: string
   strategy: string
-  dte: number
-  growthScore: number
-  elr: string | null
-  pop: string | null
-  regimeStatus: RegimeStatus
-  liquidity: number
-  impact: ImpactLevel
-  allocation: string | null
-  riskAmount: string | null
-  rationale: string
-  drivers: string[]
-  status: CandidateStatus
-  audit: AuditData | null
+  status: "GO" | "WAIT" | "NO"
+  trustScore: number
+  winLikelihoodPct: number | null
+  amountDollars: number | null
+  bullets: TradeBullets
+  auditSimple: AuditSimple
+  auditAdvanced: AuditAdvanced
 }
 
-export interface RegimeIndicator {
-  label: string
-  value: string
-  status: "green" | "yellow" | "red"
+// Portfolio types for My Money screen
+export interface WeekStats {
+  trades: number
+  wins: number
+  winRatePct: number
+  avgGainDollars: number
 }
 
-export interface RegimeData {
-  indicators: RegimeIndicator[]
-  score: number
-  status: RegimeStatus
-}
-
-export interface PortfolioData {
-  balance: string
-  dayPnl: string
-  dayPnlPositive: boolean
-  openPositions: number
-  openRisk: number
-  maxRisk: number
-  weeklyDrawdown: number
-  maxDrawdown: number
+export interface Portfolio {
+  balance: number
+  dayPnl: number
+  drawdownPct: number
+  drawdownLimitPct: number
   tradesToday: number
-  maxTrades: number
-  swarmActive: boolean
-  swarmMode: string
+  tradesTodayMax: number
+  paperTradesCompleted: number
+  paperTradesRequired: number
+  safetyMode: "training_wheels" | "normal" | "pro"
+  weekStats: WeekStats
+  dailySummary: string
 }
 
-export interface SystemStatus {
-  lastScan: string
-  nextScan: string
-  evaluated: number
-  fireCount: number
-  watchCount: number
-  blockCount: number
-  noTradeReason: string | null
-}
+export type TabId = "radar" | "trades" | "money"
