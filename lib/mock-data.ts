@@ -1,0 +1,167 @@
+import type { Theme, TradeCandidate, Portfolio } from "./types"
+
+export const mockThemes: Theme[] = [
+  {
+    name: "AI Infrastructure",
+    heat: "hot",
+    tickers: ["NVDA", "SMH", "MSFT", "AMD"],
+    brief: "AI chip demand is surging ahead of earnings season. Options activity is picking up across the sector.",
+  },
+  {
+    name: "Defense + Geopolitics",
+    heat: "warming",
+    tickers: ["LMT", "RTX", "XAR", "NOC"],
+    brief: "Defense contracts and geopolitical headlines are lifting the sector. Steady upward momentum this week.",
+  },
+  {
+    name: "Energy",
+    heat: "quiet",
+    tickers: ["XLE", "CVX", "SLB", "OXY"],
+    brief: "Energy is holding steady but no strong catalyst today. Worth watching for tomorrow's data.",
+  },
+]
+
+export const mockCandidates: TradeCandidate[] = [
+  {
+    ticker: "NVDA",
+    strategy: "Bullish Spread \u00B7 5 days",
+    status: "GO",
+    trustScore: 74,
+    winLikelihoodPct: 71,
+    amountDollars: 164,
+    bullets: {
+      why: "Momentum is strong and options costs are low right now.",
+      risk: "If NVDA drops sharply, max loss is $164.",
+      amount: "$164 recommended \u2014 about 1.6% of your practice balance.",
+    },
+    auditSimple: {
+      trustScore: 74,
+      winLikelihood: "71%",
+      marketStability: "Good",
+      fillQuality: "Good",
+      recommended: "$164",
+      decision: "GO",
+    },
+    auditAdvanced: {
+      growthScore: 0.74,
+      netElr: "+3.21% (after costs)",
+      popLowerBound: "65.1%",
+      kellyFinal: "1.6%",
+      regimeScore: 0.82,
+      liquidityScore: 0.81,
+      gates: [
+        { name: "Liquidity Check", passed: true },
+        { name: "Regime Filter", passed: true },
+        { name: "Spread Width", passed: true },
+        { name: "POP Threshold", passed: true },
+        { name: "Kelly Positive", passed: true },
+        { name: "Max Concentration", passed: true },
+        { name: "Drawdown Buffer", passed: true },
+        { name: "Time to Expiry", passed: true },
+      ],
+    },
+  },
+  {
+    ticker: "AAPL",
+    strategy: "Bullish Spread \u00B7 7 days",
+    status: "WAIT",
+    trustScore: 44,
+    winLikelihoodPct: 64,
+    amountDollars: null,
+    bullets: {
+      why: "Conditions are improving but not quite there yet.",
+      risk: "Market stability is lower than we'd like today.",
+      amount: "No trade recommended right now.",
+    },
+    auditSimple: {
+      trustScore: 44,
+      winLikelihood: "64%",
+      marketStability: "Fair",
+      fillQuality: "Good",
+      recommended: "\u2014",
+      decision: "WAIT",
+    },
+    auditAdvanced: {
+      growthScore: 0.44,
+      netElr: "+1.12% (after costs)",
+      popLowerBound: "58.2%",
+      kellyFinal: "0.8%",
+      regimeScore: 0.61,
+      liquidityScore: 0.79,
+      gates: [
+        { name: "Liquidity Check", passed: true },
+        { name: "Regime Filter", passed: false },
+        { name: "Spread Width", passed: true },
+        { name: "POP Threshold", passed: false },
+        { name: "Kelly Positive", passed: true },
+        { name: "Max Concentration", passed: true },
+        { name: "Drawdown Buffer", passed: true },
+        { name: "Time to Expiry", passed: true },
+      ],
+    },
+  },
+  {
+    ticker: "TSLA",
+    strategy: "Bearish Spread \u00B7 4 days",
+    status: "NO",
+    trustScore: 0,
+    winLikelihoodPct: null,
+    amountDollars: null,
+    bullets: {
+      why: "Market conditions are too unstable for this trade today.",
+      risk: "Fill quality is poor \u2014 hard to enter and exit cleanly.",
+      amount: "Sitting this one out.",
+    },
+    auditSimple: {
+      trustScore: 0,
+      winLikelihood: "\u2014",
+      marketStability: "Poor",
+      fillQuality: "Poor",
+      recommended: "\u2014",
+      decision: "NO",
+    },
+    auditAdvanced: {
+      growthScore: 0.0,
+      netElr: "-2.41% (after costs)",
+      popLowerBound: "42.1%",
+      kellyFinal: "-0.5%",
+      regimeScore: 0.32,
+      liquidityScore: 0.28,
+      gates: [
+        { name: "Liquidity Check", passed: false },
+        { name: "Regime Filter", passed: false },
+        { name: "Spread Width", passed: true },
+        { name: "POP Threshold", passed: false },
+        { name: "Kelly Positive", passed: false },
+        { name: "Max Concentration", passed: true },
+        { name: "Drawdown Buffer", passed: false },
+        { name: "Time to Expiry", passed: true },
+      ],
+    },
+  },
+]
+
+export const mockPortfolio: Portfolio = {
+  balance: 10247.30,
+  dayPnl: 142.80,
+  drawdownPct: 4.2,
+  drawdownLimitPct: 15.0,
+  tradesToday: 1,
+  tradesTodayMax: 1,
+  paperTradesCompleted: 47,
+  paperTradesRequired: 200,
+  safetyMode: "training_wheels",
+  weekStats: {
+    trades: 4,
+    wins: 3,
+    winRatePct: 75,
+    avgGainDollars: 38,
+  },
+  dailySummary: "You had a strong day \u2014 one clean win in AI Infrastructure. The system protected you from two risky setups.",
+}
+
+export const mockRadarData = {
+  greeting: "Good morning, Red",
+  lastScan: "6:02 AM ET",
+  nextScan: "Tomorrow 6:00 AM",
+}
