@@ -56,7 +56,7 @@ Provide your analysis with:
       output: Output.object({ schema: TradeAnalysisSchema }),
     })
 
-    return { model, analysis: result.object, error: null }
+    return { model, analysis: result.output, error: null }
   } catch (error) {
     return { model, analysis: null, error: String(error) }
   }
@@ -93,7 +93,7 @@ Provide:
     output: Output.object({ schema: SwarmConsensusSchema }),
   })
 
-  return result.object
+  return result.output
 }
 
 export async function POST(req: Request) {
