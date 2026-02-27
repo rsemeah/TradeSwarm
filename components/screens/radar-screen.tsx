@@ -4,6 +4,7 @@ import { useState } from "react"
 import { ThemeCard } from "@/components/theme-card"
 import { mockThemes, mockRadarData } from "@/lib/mock-data"
 import { useTrade } from "@/lib/trade-context"
+import { HeaderLogo, Logo } from "@/components/logo"
 import type { TradeCandidate, Theme } from "@/lib/types"
 
 interface RadarScreenProps {
@@ -38,14 +39,17 @@ export function RadarScreen({ onNavigateToTrades }: RadarScreenProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="mb-2">
-        <h1 className="text-lg text-foreground">
-          {mockRadarData.greeting}
-        </h1>
-        <p className="text-[13px] text-muted-foreground">
-          Here&apos;s what&apos;s heating up today
-        </p>
+      {/* Header with Logo */}
+      <div className="mb-2 flex items-start justify-between">
+        <div>
+          <h1 className="text-lg text-foreground">
+            {mockRadarData.greeting}
+          </h1>
+          <p className="text-[13px] text-muted-foreground">
+            Here&apos;s what&apos;s heating up today
+          </p>
+        </div>
+        <HeaderLogo />
       </div>
 
       {/* Notification */}
@@ -79,15 +83,22 @@ export function RadarScreen({ onNavigateToTrades }: RadarScreenProps) {
 
       {/* Loading indicator when analyzing */}
       {state.analysisInProgress && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80">
-          <div className="rounded-lg bg-card border border-border p-6 text-center">
-            <div className="mb-4 h-8 w-8 mx-auto animate-spin rounded-full border-2 border-accent border-t-transparent" />
-            <p className="text-sm text-foreground">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm">
+          <div className="rounded-lg bg-card border border-border p-8 text-center">
+            <div className="mb-4 flex justify-center">
+              <Logo variant="icon" size="lg" className="animate-pulse" />
+            </div>
+            <p className="text-sm font-medium text-foreground">
               AI Swarm analyzing {state.analysisInProgress}...
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              Groq + OpenAI + Claude
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Groq + OpenAI consensus engine
             </p>
+            <div className="mt-4 flex justify-center gap-1">
+              <div className="h-1.5 w-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "0ms" }} />
+              <div className="h-1.5 w-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "150ms" }} />
+              <div className="h-1.5 w-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
           </div>
         </div>
       )}

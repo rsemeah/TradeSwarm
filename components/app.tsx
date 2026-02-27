@@ -9,6 +9,7 @@ import { TradesScreen } from "@/components/screens/trades-screen"
 import { MoneyScreen } from "@/components/screens/money-screen"
 import { AuthProvider, useAuth } from "@/lib/auth-context"
 import { TradeProvider } from "@/lib/trade-context"
+import { LoadingLogo } from "@/components/logo"
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabId>("radar")
@@ -32,7 +33,7 @@ function AppContent() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+        <LoadingLogo />
       </div>
     )
   }

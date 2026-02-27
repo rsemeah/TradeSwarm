@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
+import { Logo } from "@/components/logo"
 
 export default function SignUpPage() {
   const [email, setEmail] = useState("")
@@ -53,8 +54,12 @@ export default function SignUpPage() {
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-[#0a0a0a] p-6">
       <div className="w-full max-w-[380px]">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-white">TradeSwarm</h1>
+        <div className="mb-8 flex flex-col items-center">
+          <Logo variant="icon" size="xl" />
+          <div className="mt-3 text-lg font-bold tracking-wide">
+            <span className="text-[#1B5E20]">TRADE</span>
+            <span className="text-[#C5A028]">SWARM</span>
+          </div>
           <p className="mt-2 text-sm text-[#6b6b6b]">Create your account</p>
         </div>
 
