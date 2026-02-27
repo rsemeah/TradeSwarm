@@ -64,8 +64,8 @@ export default function SignUpPage() {
         </div>
 
         <div className="rounded-xl border border-[#1f1f1f] bg-[#141414] p-6">
-          <form onSubmit={handleSignUp} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
+          <form onSubmit={handleSignUp} className="flex flex-col gap-4" suppressHydrationWarning>
+            <div className="flex flex-col gap-2" suppressHydrationWarning>
               <label htmlFor="email" className="text-sm font-medium text-white">
                 Email
               </label>
@@ -80,7 +80,7 @@ export default function SignUpPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2" suppressHydrationWarning>
               <label htmlFor="password" className="text-sm font-medium text-white">
                 Password
               </label>
@@ -94,7 +94,7 @@ export default function SignUpPage() {
               />
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2" suppressHydrationWarning>
               <label htmlFor="confirm-password" className="text-sm font-medium text-white">
                 Confirm Password
               </label>
