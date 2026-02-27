@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { fetchYahooExpirations, fetchYahooQuote } from "@/lib/market-data/yahoo"
 
 export async function GET() {
   const startTime = Date.now()
@@ -6,9 +7,8 @@ export async function GET() {
   try {
     const supabase = await createClient()
 
-    // Get recent engine events (last 24h)
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    
+
     const { data: recentTrades, count: tradeCount } = await supabase
       .from("trades")
       .select("*", { count: "exact" })
@@ -16,29 +16,43 @@ export async function GET() {
       .order("created_at", { ascending: false })
       .limit(10)
 
-    const { data: recentReceipts, count: receiptCount } = await supabase
+    const { count: receiptCount } = await supabase
       .from("trade_receipts")
-      .select("*", { count: "exact" })
-      .gte("executed_at", yesterday)
-      .limit(10)
+      .select("*", { count: "exact", head: true })
+      .gte("created_at", yesterday)
 
-    // Calculate success rate
     const successfulTrades = recentTrades?.filter((t) => t.status === "GO") || []
     const successRate = tradeCount ? (successfulTrades.length / tradeCount) * 100 : 0
 
-    // Engine status
+    let marketData = { ok: true, reason: null as string | null, quoteLatencyMs: 0, expirationsLatencyMs: 0 }
+
+    try {
+      const quoteStart = Date.now()
+      await fetchYahooQuote("NVDA")
+      marketData.quoteLatencyMs = Date.now() - quoteStart
+
+      const expStart = Date.now()
+      await fetchYahooExpirations("NVDA")
+      marketData.expirationsLatencyMs = Date.now() - expStart
+    } catch (error) {
+      marketData = {
+        ok: false,
+        reason: `Yahoo fetch failed: ${String(error)}`,
+        quoteLatencyMs: 0,
+        expirationsLatencyMs: 0,
+      }
+    }
+
     const engineStatus = {
-      status: "operational",
+      status: marketData.ok ? "operational" : "degraded",
       lastActivity: recentTrades?.[0]?.created_at || null,
-      uptime: "100%", // Placeholder for V1
+      uptime: "100%",
       metrics: {
         tradesLast24h: tradeCount || 0,
         receiptsLast24h: receiptCount || 0,
         successRate: Math.round(successRate),
         avgTrustScore: recentTrades?.length
-          ? Math.round(
-              recentTrades.reduce((sum, t) => sum + (t.trust_score || 0), 0) / recentTrades.length
-            )
+          ? Math.round(recentTrades.reduce((sum, t) => sum + (t.trust_score || 0), 0) / recentTrades.length)
           : 0,
       },
       components: {
@@ -46,13 +60,12 @@ export async function GET() {
           status: "ok",
           models: ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"],
         },
+        marketData,
         regime: {
-          status: "stub", // Will be enhanced
-          lastUpdate: null,
+          status: "basic",
         },
         risk: {
-          status: "stub", // Will be enhanced
-          lastCalculation: null,
+          status: "basic",
         },
       },
     }
