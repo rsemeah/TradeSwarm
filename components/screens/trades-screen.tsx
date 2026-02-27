@@ -9,11 +9,7 @@ export function TradesScreen() {
   if (!hasGoTrades) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-          <svg className="h-8 w-8 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-          </svg>
-        </div>
+        <span className="mb-4 text-6xl">🛡</span>
         <h2 className="mb-2 text-base font-medium text-foreground">Sitting out today</h2>
         <p className="mb-4 max-w-[280px] text-[13px] text-muted-foreground leading-relaxed">
           Markets aren&apos;t offering a clean opportunity today. That&apos;s okay — protecting capital is a win too.
