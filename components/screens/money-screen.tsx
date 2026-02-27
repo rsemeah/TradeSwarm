@@ -2,9 +2,11 @@
 
 import { mockPortfolio } from "@/lib/mock-data"
 import { formatCurrency } from "@/lib/utils"
+import { useAuth } from "@/lib/auth-context"
 
 export function MoneyScreen() {
   const portfolio = mockPortfolio
+  const { user, signOut } = useAuth()
   const progressPct = (portfolio.paperTradesCompleted / portfolio.paperTradesRequired) * 100
   const drawdownUsedPct = (portfolio.drawdownPct / portfolio.drawdownLimitPct) * 100
 
@@ -139,6 +141,20 @@ export function MoneyScreen() {
         <p className="text-xs text-muted-foreground leading-relaxed">
           {portfolio.dailySummary}
         </p>
+      </div>
+
+      {/* Account Card */}
+      <div className="rounded-[10px] border border-border bg-card p-4">
+        <h2 className="mb-3 text-[13px] font-bold text-foreground">Account</h2>
+        <p className="mb-4 text-xs text-muted-foreground">
+          {user?.email || "Not signed in"}
+        </p>
+        <button
+          onClick={signOut}
+          className="w-full rounded-lg border border-danger/30 bg-danger/10 py-3 text-sm font-medium text-danger transition-colors hover:bg-danger/20"
+        >
+          Sign Out
+        </button>
       </div>
     </div>
   )

@@ -1,14 +1,36 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import type { TabId } from "@/lib/types"
 import { TabBar } from "@/components/tab-bar"
 import { RadarScreen } from "@/components/screens/radar-screen"
 import { TradesScreen } from "@/components/screens/trades-screen"
 import { MoneyScreen } from "@/components/screens/money-screen"
+import { AuthProvider, useAuth } from "@/lib/auth-context"
 
-export function App() {
+function AppContent() {
   const [activeTab, setActiveTab] = useState<TabId>("radar")
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth/login")
+    }
+  }, [user, loading, router])
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -31,5 +53,13 @@ export function App() {
       {/* Tab Bar */}
       <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
     </div>
+  )
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
