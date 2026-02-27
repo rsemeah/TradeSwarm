@@ -1,10 +1,12 @@
 "use client"
 
 import type { Theme } from "@/lib/types"
+import { useTrade } from "@/lib/trade-context"
 
 interface ThemeCardProps {
   theme: Theme
   onSeeTrade: () => void
+  onWatch?: () => void
 }
 
 function HeatBadge({ heat }: { heat: Theme["heat"] }) {
@@ -22,7 +24,15 @@ function HeatBadge({ heat }: { heat: Theme["heat"] }) {
   )
 }
 
-export function ThemeCard({ theme, onSeeTrade }: ThemeCardProps) {
+export function ThemeCard({ theme, onSeeTrade, onWatch }: ThemeCardProps) {
+  const { state, watchTicker } = useTrade()
+  const isAnalyzing = state.analysisInProgress === theme.tickers[0]
+
+  const handleWatch = async () => {
+    await watchTicker(theme.tickers[0], theme.name)
+    onWatch?.()
+  }
+
   return (
     <div className="rounded-[10px] border border-border bg-card p-4">
       {/* Row 1: Theme name + Heat badge */}
@@ -52,11 +62,16 @@ export function ThemeCard({ theme, onSeeTrade }: ThemeCardProps) {
       <div className="flex gap-3">
         <button
           onClick={onSeeTrade}
-          className="flex-1 rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+          disabled={isAnalyzing}
+          className="flex-1 rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          See Best Trade →
+          {isAnalyzing ? "Analyzing..." : "See Best Trade →"}
         </button>
-        <button className="flex-1 rounded-md border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
+        <button 
+          onClick={handleWatch}
+          disabled={state.isLoading}
+          className="flex-1 rounded-md border border-border px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+        >
           Watch Only
         </button>
       </div>

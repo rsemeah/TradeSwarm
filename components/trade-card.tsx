@@ -3,9 +3,11 @@
 import { useState } from "react"
 import type { TradeCandidate } from "@/lib/types"
 import { getTrustScoreColor } from "@/lib/utils"
+import { useTrade } from "@/lib/trade-context"
 
 interface TradeCardProps {
   candidate: TradeCandidate
+  onTradeComplete?: () => void
 }
 
 function StatusBadge({ status }: { status: TradeCandidate["status"] }) {
@@ -139,13 +141,25 @@ function AuditPanel({ candidate, view }: { candidate: TradeCandidate; view: "sim
   )
 }
 
-export function TradeCard({ candidate }: TradeCardProps) {
+export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
   const [showAudit, setShowAudit] = useState(false)
   const [auditView, setAuditView] = useState<"simple" | "advanced">("simple")
+  const { state, executeTrade, simulateTrade } = useTrade()
 
   const isGo = candidate.status === "GO"
   const isWait = candidate.status === "WAIT"
   const isNo = candidate.status === "NO"
+  const isLoading = state.isLoading && state.currentAction?.trade?.ticker === candidate.ticker
+
+  const handleExecute = async () => {
+    await executeTrade(candidate)
+    onTradeComplete?.()
+  }
+
+  const handleSimulate = async () => {
+    await simulateTrade(candidate)
+    onTradeComplete?.()
+  }
 
   return (
     <div className="rounded-[10px] border border-border bg-card p-4">
@@ -181,11 +195,19 @@ export function TradeCard({ candidate }: TradeCardProps) {
       <div className="mb-3 space-y-2">
         {isGo && (
           <>
-            <button className="w-full rounded-md bg-accent py-3 text-sm font-bold text-background transition-opacity hover:opacity-90">
-              Execute Trade →
+            <button 
+              onClick={handleExecute}
+              disabled={isLoading}
+              className="w-full rounded-md bg-accent py-3 text-sm font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? "Processing..." : "Execute Trade →"}
             </button>
-            <button className="w-full rounded-md border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
-              Simulate First
+            <button 
+              onClick={handleSimulate}
+              disabled={isLoading}
+              className="w-full rounded-md border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            >
+              {isLoading ? "Processing..." : "Simulate First"}
             </button>
           </>
         )}
@@ -194,8 +216,12 @@ export function TradeCard({ candidate }: TradeCardProps) {
             <button className="w-full cursor-not-allowed rounded-md bg-muted py-3 text-sm font-medium text-muted-foreground opacity-50">
               Watching...
             </button>
-            <button className="w-full rounded-md border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted">
-              Simulate Anyway
+            <button 
+              onClick={handleSimulate}
+              disabled={isLoading}
+              className="w-full rounded-md border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
+            >
+              {isLoading ? "Processing..." : "Simulate Anyway"}
             </button>
           </>
         )}
