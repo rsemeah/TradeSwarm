@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { fetchYahooExpirations, fetchYahooQuote } from "@/lib/market-data/yahoo"
+import { getMarketDataCircuitStatus } from "@/lib/engine/regime"
+import { getCircuitState } from "@/lib/adapters/http"
 
 export async function GET() {
   const startTime = Date.now()
@@ -66,7 +68,16 @@ export async function GET() {
         },
         risk: {
           status: "basic",
+          status: "operational",
+          circuit: getMarketDataCircuitStatus(),
         },
+        risk: {
+          status: "operational",
+          lastCalculation: null,
+        },
+      },
+      circuitBreakers: {
+        yahooFinance: getMarketDataCircuitStatus(),
       },
     }
 
