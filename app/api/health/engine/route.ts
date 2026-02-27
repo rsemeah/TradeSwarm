@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
+import { getMarketDataCircuitStatus } from "@/lib/engine/regime"
+import { getCircuitState } from "@/lib/adapters/http"
 
 export async function GET() {
   const startTime = Date.now()
@@ -47,13 +49,16 @@ export async function GET() {
           models: ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"],
         },
         regime: {
-          status: "stub", // Will be enhanced
-          lastUpdate: null,
+          status: "operational",
+          circuit: getMarketDataCircuitStatus(),
         },
         risk: {
-          status: "stub", // Will be enhanced
+          status: "operational",
           lastCalculation: null,
         },
+      },
+      circuitBreakers: {
+        yahooFinance: getMarketDataCircuitStatus(),
       },
     }
 
