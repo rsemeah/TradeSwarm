@@ -104,11 +104,13 @@ export async function POST(req: Request) {
       return Response.json({ error: "Ticker is required" }, { status: 400 })
     }
 
-    // Models to use - Groq is free and primary, others optional for swarm consensus
-    // Only use multi-model if AI_GATEWAY_API_KEY is set (for OpenAI/Anthropic)
-    const hasGatewayKey = !!process.env.AI_GATEWAY_API_KEY
-    const models = useSwarm && hasGatewayKey
-      ? ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini", "anthropic/claude-3-5-haiku-latest"]
+    // Models to use - Groq is free and primary, OpenAI as second opinion
+    // Check which API keys are available
+    const hasOpenAI = !!process.env.AI_GATEWAY_API_KEY || !!process.env.OPENAI_API_KEY
+    
+    // Use Groq + OpenAI for dual-model consensus (both fast and accurate)
+    const models = useSwarm && hasOpenAI
+      ? ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"]
       : ["groq/llama-3.3-70b-versatile"] // Groq-only mode (free tier)
 
     // Run analyses in parallel
@@ -155,7 +157,23 @@ export async function POST(req: Request) {
         model: r.model,
         status: r.analysis.status,
         trustScore: r.analysis.trustScore,
+        reasoning: r.analysis.reasoning,
       })),
+      // For receipt drawer AI breakdown
+      aiConsensus: successfulAnalyses.length > 1 ? {
+        groq: successfulAnalyses.find(a => a.model.includes("groq")) ? {
+          decision: successfulAnalyses.find(a => a.model.includes("groq"))!.analysis.status,
+          confidence: successfulAnalyses.find(a => a.model.includes("groq"))!.analysis.trustScore,
+          reasoning: successfulAnalyses.find(a => a.model.includes("groq"))!.analysis.reasoning,
+        } : undefined,
+        openai: successfulAnalyses.find(a => a.model.includes("openai")) ? {
+          decision: successfulAnalyses.find(a => a.model.includes("openai"))!.analysis.status,
+          confidence: successfulAnalyses.find(a => a.model.includes("openai"))!.analysis.trustScore,
+          reasoning: successfulAnalyses.find(a => a.model.includes("openai"))!.analysis.reasoning,
+        } : undefined,
+        finalVerdict: consensus?.finalDecision || finalAnalysis.status,
+        consensusStrength: consensus?.confidenceScore || finalAnalysis.trustScore,
+      } : undefined,
     })
   } catch (error) {
     console.error("Analysis error:", error)

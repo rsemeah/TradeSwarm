@@ -4,6 +4,8 @@ import { useState } from "react"
 import type { TradeCandidate } from "@/lib/types"
 import { getTrustScoreColor } from "@/lib/utils"
 import { useTrade } from "@/lib/trade-context"
+import { SniperOverlay } from "./sniper-overlay"
+import { LearnWhyModal } from "./learn-why-modal"
 
 interface TradeCardProps {
   candidate: TradeCandidate
@@ -144,6 +146,8 @@ function AuditPanel({ candidate, view }: { candidate: TradeCandidate; view: "sim
 export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
   const [showAudit, setShowAudit] = useState(false)
   const [auditView, setAuditView] = useState<"simple" | "advanced">("simple")
+  const [showSniper, setShowSniper] = useState<"execute" | "simulate" | null>(null)
+  const [showLearnWhy, setShowLearnWhy] = useState(false)
   const { state, executeTrade, simulateTrade } = useTrade()
 
   const isGo = candidate.status === "GO"
@@ -151,19 +155,42 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
   const isNo = candidate.status === "NO"
   const isLoading = state.isLoading && state.currentAction?.trade?.ticker === candidate.ticker
 
-  const handleExecute = async () => {
-    await executeTrade(candidate)
+  const handleExecuteClick = () => setShowSniper("execute")
+  const handleSimulateClick = () => setShowSniper("simulate")
+
+  const handleSniperConfirm = async () => {
+    setShowSniper(null)
+    if (showSniper === "execute") {
+      await executeTrade(candidate)
+    } else {
+      await simulateTrade(candidate)
+    }
     onTradeComplete?.()
   }
 
-  const handleSimulate = async () => {
-    await simulateTrade(candidate)
-    onTradeComplete?.()
-  }
+  const handleSniperCancel = () => setShowSniper(null)
 
   return (
-    <div className="rounded-[10px] border border-border bg-card p-4">
-      <StatusBadge status={candidate.status} />
+    <>
+      {/* Sniper Overlay for Execute/Simulate confirmation */}
+      {showSniper && (
+        <SniperOverlay
+          candidate={candidate}
+          onConfirm={handleSniperConfirm}
+          onCancel={handleSniperCancel}
+          isSimulation={showSniper === "simulate"}
+        />
+      )}
+      
+      {/* Learn Why Modal for NO/WAIT trades */}
+      <LearnWhyModal
+        isOpen={showLearnWhy}
+        onClose={() => setShowLearnWhy(false)}
+        candidate={candidate}
+      />
+      
+      <div className="rounded-[10px] border border-border bg-card p-4">
+        <StatusBadge status={candidate.status} />
 
       {/* Ticker + Strategy */}
       <div className="mb-4 text-center">
@@ -196,14 +223,14 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
         {isGo && (
           <>
             <button 
-              onClick={handleExecute}
+              onClick={handleExecuteClick}
               disabled={isLoading}
               className="w-full rounded-md bg-accent py-3 text-sm font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? "Processing..." : "Execute Trade →"}
             </button>
             <button 
-              onClick={handleSimulate}
+              onClick={handleSimulateClick}
               disabled={isLoading}
               className="w-full rounded-md border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
             >
@@ -217,7 +244,7 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
               Watching...
             </button>
             <button 
-              onClick={handleSimulate}
+              onClick={handleSimulateClick}
               disabled={isLoading}
               className="w-full rounded-md border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted disabled:opacity-50"
             >
@@ -231,7 +258,7 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
               Blocked
             </button>
             <button
-              onClick={() => setShowAudit(!showAudit)}
+              onClick={() => setShowLearnWhy(true)}
               className="w-full rounded-md border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted"
             >
               Learn Why
@@ -281,6 +308,7 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
           <AuditPanel candidate={candidate} view={auditView} />
         </div>
       )}
-    </div>
+      </div>
+    </>
   )
 }
