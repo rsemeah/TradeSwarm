@@ -9,7 +9,20 @@ export async function POST(req: Request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { trade, aiConsensus, regime, risk } = await req.json()
+    const {
+      trade,
+      aiConsensus,
+      regime,
+      risk,
+      marketContext,
+      deliberation,
+      scoring,
+      modelVersions,
+      provenance,
+      engineTimeline,
+      engineVersion,
+      schemaVersion,
+    } = await req.json()
 
     if (!trade) {
       return Response.json({ error: "Trade data is required" }, { status: 400 })
@@ -44,6 +57,7 @@ export async function POST(req: Request) {
     }
 
     // Create simulation receipt
+    const executedAt = new Date().toISOString()
     const receiptRecord = {
       trade_id: insertedTrade.id,
       user_id: user.id,
@@ -51,10 +65,35 @@ export async function POST(req: Request) {
       action: "simulate",
       amount: trade.amountDollars,
       trust_score: trade.trustScore,
-      ai_consensus: aiConsensus,
-      regime_snapshot: regime,
-      risk_snapshot: risk,
-      executed_at: new Date().toISOString(),
+      executed_at: executedAt,
+      schema_version: schemaVersion ?? 2,
+      engine_version: engineVersion ?? "v2-canonical",
+      market_context: marketContext ?? {
+        ticker: trade.ticker,
+        action: "simulate",
+        amount: trade.amountDollars,
+        status: trade.status,
+        strategy: trade.strategy || "options_spread",
+      },
+      regime: regime ?? null,
+      risk: risk ?? null,
+      deliberation: deliberation ?? {
+        ai_consensus: aiConsensus ?? null,
+      },
+      scoring: scoring ?? {
+        trust_score: trade.trustScore ?? null,
+      },
+      model_versions: modelVersions ?? {
+        engine: engineVersion ?? "v2-canonical",
+      },
+      provenance: provenance ?? {
+        route: "/api/trade/simulate",
+        source: "trade-simulate-api",
+      },
+      engine_timeline: engineTimeline ?? {
+        executed_at: executedAt,
+        created_at: executedAt,
+      },
     }
 
     await supabase.from("trade_receipts").insert(receiptRecord)
