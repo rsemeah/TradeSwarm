@@ -2,17 +2,26 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import type { TabId } from "@/lib/types"
+import type { TabId, TradeCandidate } from "@/lib/types"
 import { TabBar } from "@/components/tab-bar"
 import { RadarScreen } from "@/components/screens/radar-screen"
 import { TradesScreen } from "@/components/screens/trades-screen"
 import { MoneyScreen } from "@/components/screens/money-screen"
 import { AuthProvider, useAuth } from "@/lib/auth-context"
+import { TradeProvider } from "@/lib/trade-context"
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState<TabId>("radar")
+  const [aiCandidate, setAiCandidate] = useState<TradeCandidate | null>(null)
   const { user, loading } = useAuth()
   const router = useRouter()
+
+  const handleNavigateToTrades = (candidate?: TradeCandidate) => {
+    if (candidate) {
+      setAiCandidate(candidate)
+    }
+    setActiveTab("trades")
+  }
 
   useEffect(() => {
     if (!loading && !user) {
@@ -37,9 +46,9 @@ function AppContent() {
       {/* Main Content Area - max 420px centered */}
       <main className="mx-auto max-w-[420px] px-4 pb-24 pt-6">
         {activeTab === "radar" && (
-          <RadarScreen onNavigateToTrades={() => setActiveTab("trades")} />
+          <RadarScreen onNavigateToTrades={handleNavigateToTrades} />
         )}
-        {activeTab === "trades" && <TradesScreen />}
+        {activeTab === "trades" && <TradesScreen aiCandidate={aiCandidate} />}
         {activeTab === "money" && <MoneyScreen />}
       </main>
 
@@ -59,7 +68,9 @@ function AppContent() {
 export function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <TradeProvider>
+        <AppContent />
+      </TradeProvider>
     </AuthProvider>
   )
 }
