@@ -13,7 +13,7 @@ export function RadarScreen({ onNavigateToTrades }: RadarScreenProps) {
       {/* Header */}
       <div className="mb-2">
         <h1 className="text-lg text-foreground">
-          {mockRadarData.greeting} <span className="inline">👋</span>
+          {mockRadarData.greeting}
         </h1>
         <p className="text-[13px] text-muted-foreground">
           Here&apos;s what&apos;s heating up today
@@ -23,7 +23,7 @@ export function RadarScreen({ onNavigateToTrades }: RadarScreenProps) {
       {/* Training Wheels Banner */}
       <div className="rounded-lg bg-warning px-3 py-2.5">
         <p className="text-sm font-medium text-background">
-          🛡 Training Wheels ON · Max 1 trade/day · Paper mode
+          Training Wheels ON - Max 1 trade/day - Paper mode
         </p>
         <p className="mt-0.5 text-[11px] text-background/70">
           Turn off after 200 trades

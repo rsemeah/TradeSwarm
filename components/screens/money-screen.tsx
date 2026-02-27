@@ -62,13 +62,13 @@ export function MoneyScreen() {
                 : "border-border text-muted-foreground"
             }`}
           >
-            🛡 Training Wheels
+            Training Wheels
           </button>
           <button className="flex-1 rounded-full border border-border px-3 py-2 text-xs font-medium text-muted-foreground opacity-50">
-            ⚡ Normal
+            Normal
           </button>
           <button className="flex-1 rounded-full border border-border px-3 py-2 text-xs font-medium text-muted-foreground opacity-50">
-            🚀 Pro
+            Pro
           </button>
         </div>
         <p className="mt-2 text-[10px] text-muted-foreground">
