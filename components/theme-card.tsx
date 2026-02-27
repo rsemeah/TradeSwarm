@@ -9,15 +9,15 @@ interface ThemeCardProps {
 
 function HeatBadge({ heat }: { heat: Theme["heat"] }) {
   const config = {
-    hot: { bg: "bg-accent", text: "text-background", label: "Hot", icon: "\uD83D\uDD25" },
-    warming: { bg: "bg-warning", text: "text-background", label: "Warming", icon: "\uD83D\uDCC8" },
-    quiet: { bg: "bg-muted", text: "text-muted-foreground", label: "Quiet", icon: "\uD83D\uDE34" },
+    hot: { bg: "bg-accent", text: "text-background", label: "Hot" },
+    warming: { bg: "bg-warning", text: "text-background", label: "Warming" },
+    quiet: { bg: "bg-muted", text: "text-muted-foreground", label: "Quiet" },
   }
-  const { bg, text, label, icon } = config[heat]
+  const { bg, text, label } = config[heat]
 
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${bg} ${text}`}>
-      {icon} {label}
+      {label}
     </span>
   )
 }
