@@ -64,6 +64,20 @@ export async function POST(req: Request) {
       return Response.json({ error: "Failed to record trade" }, { status: 500 })
     }
 
+
+    const receiptRecord = {
+      trade_id: insertedTrade.id,
+      user_id: user.id,
+      ticker: trade.ticker,
+      action,
+      amount: trade.amountDollars || 0,
+      trust_score: trade.trustScore,
+      scoring: trade.scoring || null,
+      executed_at: new Date().toISOString(),
+    }
+
+    await supabase.from("trade_receipts").insert(receiptRecord)
+
     // Update paper trades count if in training wheels
     if (safetyMode === "training_wheels") {
       await supabase
@@ -78,6 +92,7 @@ export async function POST(req: Request) {
     return Response.json({
       success: true,
       trade: insertedTrade,
+      receipt: receiptRecord,
       message: action === "execute" 
         ? `Trade executed: ${trade.ticker} for $${trade.amountDollars}` 
         : `Simulation recorded: ${trade.ticker}`,

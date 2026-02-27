@@ -128,6 +128,24 @@ function AuditPanel({ candidate, view }: { candidate: TradeCandidate; view: "sim
         <span className="text-muted-foreground">Liquidity Score:</span>
         <span className="font-mono text-foreground">{auditAdvanced.liquidityScore.toFixed(2)}</span>
       </div>
+      {candidate.scoring && (
+        <div className="rounded border border-border/70 bg-background/50 p-2">
+          <p className="mb-1 text-[10px] font-bold text-muted-foreground">SCORING BREAKDOWN ({candidate.scoring.formula.version})</p>
+          {candidate.scoring.factors.slice(0, 3).map((factor) => (
+            <div key={factor.name} className="flex justify-between text-[10px]">
+              <span className="text-muted-foreground">{factor.name}</span>
+              <span className="font-mono text-foreground">{factor.impact >= 0 ? "+" : ""}{factor.impact}</span>
+            </div>
+          ))}
+          {candidate.scoring.penalties.map((penalty) => (
+            <div key={penalty.name} className="flex justify-between text-[10px]">
+              <span className="text-danger">{penalty.name}</span>
+              <span className="font-mono text-danger">{penalty.impact}</span>
+            </div>
+          ))}
+          <p className="mt-1 text-[9px] text-muted-foreground">{candidate.scoring.formula.policy}</p>
+        </div>
+      )}
       <div className="mt-3 border-t border-border pt-3">
         <p className="mb-2 text-[11px] font-bold text-muted-foreground">GATE RESULTS</p>
         <div className="space-y-1">

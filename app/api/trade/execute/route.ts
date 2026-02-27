@@ -79,6 +79,7 @@ export async function POST(req: Request) {
       ai_consensus: aiConsensus,
       regime_snapshot: regime,
       risk_snapshot: risk,
+      scoring: trade.scoring || null,
       executed_at: new Date().toISOString(),
     }
 

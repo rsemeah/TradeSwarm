@@ -1,5 +1,7 @@
 import { generateText, Output } from "ai"
 import { z } from "zod"
+import { runEngineAnalysis } from "@/lib/engine"
+import { calculateCredibilityScore } from "@/lib/scoring/credibility"
 
 // Schema for trade analysis output
 const TradeAnalysisSchema = z.object({
@@ -98,6 +100,7 @@ Provide:
 
 export async function POST(req: Request) {
   try {
+    const startedAt = Date.now()
     const { ticker, theme, marketContext, useSwarm = true } = await req.json()
 
     if (!ticker) {
@@ -149,10 +152,60 @@ export async function POST(req: Request) {
       finalAnalysis = successfulAnalyses[0].analysis
     }
 
+    const engineAnalysis = await runEngineAnalysis(ticker, 150, 10000, finalAnalysis.trustScore)
+    const uniqueDecisions = new Set(successfulAnalyses.map((a) => a.analysis.status))
+    const majorityDecision =
+      successfulAnalyses
+        .map((a) => a.analysis.status)
+        .sort(
+          (a, b) =>
+            successfulAnalyses.filter((x) => x.analysis.status === b).length -
+            successfulAnalyses.filter((x) => x.analysis.status === a).length
+        )[0] || finalAnalysis.status
+    const agreementRatio =
+      successfulAnalyses.filter((a) => a.analysis.status === majorityDecision).length /
+      Math.max(successfulAnalyses.length, 1)
+
+    const credibility = calculateCredibilityScore({
+      baseTrustScore: finalAnalysis.trustScore,
+      deliberation: {
+        agreementRatio,
+        arbitrationUsed: !!consensus,
+        dissentCount: Math.max(uniqueDecisions.size - 1, 0),
+      },
+      regime: {
+        confidence: engineAnalysis.regime.confidence,
+        volatility: engineAnalysis.regime.volatility,
+      },
+      risk: {
+        grade: engineAnalysis.risk.riskLevel,
+      },
+      liquidity: {
+        volumeRatio: engineAnalysis.regime.signals.volumeRatio,
+        spreadProxy:
+          engineAnalysis.regime.volatility === "low"
+            ? 0.2
+            : engineAnalysis.regime.volatility === "medium"
+              ? 0.45
+              : 0.75,
+      },
+      freshness: {
+        marketDataAgeMs: Date.now() - new Date(engineAnalysis.regime.timestamp).getTime(),
+        modelDataAgeMs: Date.now() - startedAt,
+      },
+    })
+
+    finalAnalysis.trustScore = credibility.trustScore
+
     return Response.json({
       success: true,
       analysis: finalAnalysis,
       consensus,
+      credibility,
+      engine: {
+        regime: engineAnalysis.regime,
+        risk: engineAnalysis.risk,
+      },
       modelResults: successfulAnalyses.map((r) => ({
         model: r.model,
         status: r.analysis.status,

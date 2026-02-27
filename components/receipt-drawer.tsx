@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { TradeCandidate } from "@/lib/types"
+import type { TradeCandidate, TradeScoringDetail } from "@/lib/types"
 
 interface ReceiptData {
   trade: TradeCandidate
@@ -14,6 +14,7 @@ interface ReceiptData {
     finalVerdict: string
     consensusStrength: number
   }
+  scoring?: TradeScoringDetail
   gates?: {
     name: string
     passed: boolean
@@ -33,7 +34,7 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
 
   if (!isOpen || !receipt) return null
 
-  const { trade, executedAt, isSimulation, aiConsensus, gates } = receipt
+  const { trade, executedAt, isSimulation, aiConsensus, scoring, gates } = receipt
 
   return (
     <div className="fixed inset-0 z-50">
@@ -137,6 +138,19 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
                 <p className="mb-2 text-[10px] font-bold text-muted-foreground">WHY THIS TRADE</p>
                 <p className="text-xs text-foreground leading-relaxed">{trade.bullets.why}</p>
               </div>
+
+              {scoring && (
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="mb-2 text-[10px] font-bold text-muted-foreground">SCORING EXPLANATION</p>
+                  {scoring.factors.slice(0, 4).map((factor) => (
+                    <div key={factor.name} className="flex items-center justify-between text-[10px]">
+                      <span className="text-muted-foreground">{factor.name}</span>
+                      <span className="font-mono text-foreground">{factor.impact >= 0 ? "+" : ""}{factor.impact}</span>
+                    </div>
+                  ))}
+                  <p className="mt-2 text-[10px] text-muted-foreground">{scoring.formula.policy}</p>
+                </div>
+              )}
               
               {/* Risk */}
               <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
