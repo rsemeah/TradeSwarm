@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { evaluateSafety } from "@/lib/engine/safety"
 import { runTradeSwarm } from "@/lib/engine/orchestrator"
+import { hashDeterministic } from "@/lib/engine/determinism"
 import type { ProofBundle } from "@/lib/types/proof"
 import type { CanonicalProofBundle, ModelRound, SafetyDecision } from "@/lib/types/proof-bundle"
 
@@ -23,6 +24,11 @@ interface CanonicalTradeResult {
   receiptId: string | null
   tradeId: string | null
   blocked: boolean
+}
+
+interface PersistedMarketSnapshot {
+  snapshotId: string | null
+  contentHash: string
 }
 
 function buildModelRounds(bundle: ProofBundle): ModelRound[] {
@@ -89,6 +95,39 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
   const firstOutput = modelRounds[0]?.providers[0]
   const safetyDecision = deriveSafetyDecision(bundle, input.amount, input.balance, input.mode)
 
+  const normalizedInputSnapshot = {
+    ticker: input.ticker,
+    requested_amount: input.amount,
+    balance: input.balance,
+    safety_mode: input.safetyMode,
+    theme: input.theme,
+    user_context: input.userContext,
+  }
+
+  const normalizedMarketSnapshot = {
+    quote: bundle.marketContext.quote,
+    chain: bundle.marketContext.chain,
+    provider_health: bundle.marketContext.providerHealth,
+    as_of: bundle.marketContext.ts,
+    source: "orchestrator.marketContext",
+    latency_ms: null,
+  }
+
+  const marketSnapshotHash = hashDeterministic(normalizedMarketSnapshot)
+  const configHash = hashDeterministic({
+    execution_mode: input.mode,
+    safety_mode: input.safetyMode,
+    theme: input.theme,
+  })
+  const randomSeed = null
+  const determinismHash = hashDeterministic({
+    input_snapshot: normalizedInputSnapshot,
+    market_snapshot_hash: marketSnapshotHash,
+    engine_version: bundle.engineVersion,
+    config_hash: configHash,
+    random_seed: randomSeed,
+  })
+
   return {
     version: "v2",
     model_provider: firstOutput?.provider ?? "unknown",
@@ -101,32 +140,66 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
     trust_score: bundle.finalDecision.trustScore,
     execution_mode: input.mode,
     timestamp: bundle.ts,
-    input_snapshot: {
-      ticker: input.ticker,
-      requested_amount: input.amount,
-      balance: input.balance,
-      safety_mode: input.safetyMode,
-      theme: input.theme,
-      user_context: input.userContext,
-    },
-    market_snapshot: {
-      quote: bundle.marketContext.quote,
-      chain: bundle.marketContext.chain,
-      provider_health: bundle.marketContext.providerHealth,
-      as_of: bundle.marketContext.ts,
-    },
+    input_snapshot: normalizedInputSnapshot,
+    market_snapshot: normalizedMarketSnapshot,
     metadata: {
       request_id: bundle.requestId,
       engine_version: bundle.engineVersion,
       warnings: bundle.warnings,
       safety_status: safetyDecision.safety_status,
       reason_code: safetyDecision.reason_code,
+      determinism: {
+        market_snapshot_ref: null,
+        market_snapshot_hash: marketSnapshotHash,
+        engine_version: bundle.engineVersion,
+        config_hash: configHash,
+        determinism_hash: determinismHash,
+        random_seed: randomSeed,
+      },
     },
   }
 }
 
+async function persistMarketSnapshot(canonicalBundle: CanonicalProofBundle): Promise<PersistedMarketSnapshot> {
+  const supabase = await createClient()
+  const contentHash = hashDeterministic(canonicalBundle.market_snapshot)
+
+  const payload = {
+    snapshot_hash: contentHash,
+    snapshot: canonicalBundle.market_snapshot,
+    source: String(canonicalBundle.market_snapshot.source ?? "unknown"),
+    as_of: canonicalBundle.market_snapshot.as_of,
+    latency_ms: canonicalBundle.market_snapshot.latency_ms,
+  }
+
+  const { data, error } = await supabase
+    .from("market_snapshots")
+    .upsert(payload, { onConflict: "snapshot_hash", ignoreDuplicates: false })
+    .select("id")
+    .single()
+
+  if (error) {
+    return { snapshotId: null, contentHash }
+  }
+
+  return { snapshotId: data.id as string, contentHash }
+}
+
 async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: CanonicalProofBundle): Promise<{ receiptId: string | null; tradeId: string | null }> {
   const supabase = await createClient()
+  const persistedSnapshot = await persistMarketSnapshot(canonicalBundle)
+
+  if (canonicalBundle.metadata?.determinism) {
+    canonicalBundle.metadata.determinism.market_snapshot_ref = persistedSnapshot.snapshotId
+    canonicalBundle.metadata.determinism.market_snapshot_hash = persistedSnapshot.contentHash
+    canonicalBundle.metadata.determinism.determinism_hash = hashDeterministic({
+      input_snapshot: canonicalBundle.input_snapshot,
+      market_snapshot_hash: persistedSnapshot.contentHash,
+      engine_version: canonicalBundle.metadata.determinism.engine_version,
+      config_hash: canonicalBundle.metadata.determinism.config_hash,
+      random_seed: canonicalBundle.metadata.determinism.random_seed,
+    })
+  }
 
   let tradeId: string | null = null
   if (input.mode !== "preview" && canonicalBundle.safety_decision.safety_status === "ALLOWED") {
@@ -189,6 +262,39 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
   return { receiptId: receipt.id as string, tradeId }
 }
 
+async function enforceReplayPolicy(mode: CanonicalMode, engineVersion: string): Promise<void> {
+  if (mode !== "execute") return
+
+  const coverageThreshold = Number(process.env.REPLAY_COVERAGE_THRESHOLD ?? 0)
+  const mismatchThreshold = Number(process.env.REPLAY_MISMATCH_THRESHOLD ?? 1)
+  if (coverageThreshold <= 0 && mismatchThreshold >= 1) return
+
+  const supabase = await createClient()
+  const [{ count: totalReceipts }, { count: deterministicReceipts }, { data: replayRows }] = await Promise.all([
+    supabase
+      .from("trade_receipts")
+      .select("id", { count: "exact", head: true })
+      .filter("proof_bundle->metadata->>engine_version", "eq", engineVersion),
+    supabase
+      .from("trade_receipts")
+      .select("id", { count: "exact", head: true })
+      .filter("proof_bundle->metadata->>engine_version", "eq", engineVersion)
+      .not("proof_bundle->metadata->determinism", "is", null),
+    supabase.from("trade_replay_reports").select("match").order("created_at", { ascending: false }).limit(100),
+  ])
+
+  const coverage = (deterministicReceipts ?? 0) / Math.max(totalReceipts ?? 1, 1)
+  const mismatchRate = replayRows?.length ? replayRows.filter((row) => !row.match).length / replayRows.length : 0
+
+  if (coverage < coverageThreshold) {
+    throw new Error(`Replay coverage gate blocked execution: coverage ${coverage.toFixed(2)} < ${coverageThreshold.toFixed(2)}`)
+  }
+
+  if (mismatchRate > mismatchThreshold) {
+    throw new Error(`Replay mismatch gate blocked execution: mismatch ${mismatchRate.toFixed(2)} > ${mismatchThreshold.toFixed(2)}`)
+  }
+}
+
 export async function runCanonicalTrade(input: CanonicalTradeInput): Promise<CanonicalTradeResult> {
   const base = await runTradeSwarm({
     ticker: input.ticker,
@@ -202,6 +308,7 @@ export async function runCanonicalTrade(input: CanonicalTradeInput): Promise<Can
   })
 
   const canonicalProofBundle = buildCanonicalProofBundle(base.proofBundle, input)
+  await enforceReplayPolicy(input.mode, canonicalProofBundle.metadata?.engine_version ?? "unknown")
   const blocked = canonicalProofBundle.safety_decision.safety_status === "BLOCKED"
 
   const shouldPersist = input.mode === "preview" || input.mode === "simulate" || (input.mode === "execute" && !blocked)
