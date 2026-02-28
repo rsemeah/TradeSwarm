@@ -200,6 +200,7 @@ export interface DeterminismContext {
   config_hash: string
   determinism_hash: string
   random_seed: number | null
+  monte_carlo_seed?: number | null
 }
 
 export interface CanonicalProofBundle {
@@ -237,5 +238,105 @@ export interface CanonicalProofBundle {
     safety_status?: string
     reason_code?: string | null
     determinism?: DeterminismContext
+  }
+}
+
+const DEFAULT_NEWS: NewsResult = {
+  sentiment: 0,
+  confidence: 'None',
+  sources_used: [],
+  headlines: [],
+}
+
+const DEFAULT_FLAGS: CandidateFlags = {
+  earnings_within_dte: false,
+  fomc_within_5d: false,
+  cpi_within_3d: false,
+  nfp_within_3d: false,
+  low_liquidity: false,
+  iv_history_insufficient: false,
+  iv_data_missing: false,
+  delta_approximated: false,
+  catalyst_mode_trade: false,
+  fill_assumption_mid: true,
+  sized_at_hard_cap: false,
+}
+
+const DEFAULT_STRESS: StressProof = {
+  sigma_used: 0.2,
+  sigma_source: 'default_0.20',
+  scenarios: {
+    up_1s: { price: 0, pnl_total: 0, label: 'Partial' },
+    down_1s: { price: 0, pnl_total: 0, label: 'Partial' },
+    up_2s: { price: 0, pnl_total: 0, label: 'Loss' },
+    down_2s: { price: 0, pnl_total: 0, label: 'Loss' },
+  },
+}
+
+/**
+ * Backwards-compatible adapter for persisted/legacy bundles.
+ * Always returns a v3-safe CandidateProofBundle shape.
+ */
+export function upgradeProofBundleToV3(old: unknown): CandidateProofBundle {
+  const o = (typeof old === 'object' && old !== null ? old : {}) as Record<string, unknown>
+  const netCreditPs = Number(o.net_credit_ps ?? o.net_credit ?? 0)
+  const contracts = Number(o.contracts ?? 0)
+  const defaultTotal = netCreditPs * 100 * contracts
+
+  return {
+    candidate_id: String(o.candidate_id ?? crypto.randomUUID()),
+    generated_at: String(o.generated_at ?? new Date(0).toISOString()),
+    data_timestamp: String(o.data_timestamp ?? new Date(0).toISOString()),
+    source: String(o.source ?? 'legacy'),
+    cache_hit: Boolean(o.cache_hit),
+    ticker: String(o.ticker ?? 'UNKNOWN'),
+    underlying_price: Number(o.underlying_price ?? 0),
+    strategy: (o.strategy as Strategy) ?? 'PCS',
+    tier: (o.tier as Tier) ?? 'C',
+    dte: Number(o.dte ?? 0),
+    expiry_date: String(o.expiry_date ?? new Date(0).toISOString().split('T')[0]),
+    legs: Array.isArray(o.legs) ? (o.legs as LegProof[]) : [],
+    net_credit_ps: netCreditPs,
+    net_credit_total: Number(o.net_credit_total ?? defaultTotal),
+    net_debit_ps: Number(o.net_debit_ps ?? 0),
+    net_debit_total: Number(o.net_debit_total ?? 0),
+    max_loss_ps: Number(o.max_loss_ps ?? 0),
+    max_loss_total: Number(o.max_loss_total ?? 0),
+    max_profit_ps: Number(o.max_profit_ps ?? 0),
+    max_profit_total: Number(o.max_profit_total ?? 0),
+    breakeven_price: Number(o.breakeven_price ?? 0),
+    contracts,
+    actual_risk_total: Number(o.actual_risk_total ?? 0),
+    fill_assumption: 'mid',
+    ROR: Number(o.ROR ?? 0),
+    score: (o.score as ScoreProof) ?? {
+      raw_score: 0,
+      event_penalty: 0,
+      regime_bonus: 0,
+      total: 0,
+      display: 0,
+      components: {
+        ror_score: 0,
+        pop_score: 0,
+        iv_rv_score: 0,
+        liquidity_score: 0,
+      },
+      weights: { ror: 0.35, pop: 0.25, iv_rv: 0.2, liquidity: 0.15 },
+      computed_at: new Date(0).toISOString(),
+    },
+    iv_rv: (o.iv_rv as IvRvProof) ?? {
+      current_iv: 0,
+      rv20_low: 0,
+      rv20_high: 0,
+      position: 0,
+      data_sufficient: false,
+    },
+    regime: (o.regime as RegimeResult) ?? { regime: 'CHOPPY', confidence: 0, source: 'legacy' },
+    news_ticker: (o.news_ticker as NewsResult) ?? DEFAULT_NEWS,
+    news_macro: (o.news_macro as NewsResult) ?? DEFAULT_NEWS,
+    flags: { ...DEFAULT_FLAGS, ...(o.flags as Partial<CandidateFlags> ?? {}) },
+    sizing_modifier: Number(o.sizing_modifier ?? 1),
+    sizing_reason: String(o.sizing_reason ?? 'legacy_defaults'),
+    stress: (o.stress as StressProof) ?? DEFAULT_STRESS,
   }
 }
