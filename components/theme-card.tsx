@@ -5,7 +5,7 @@ import { useTrade } from "@/lib/trade-context"
 
 interface ThemeCardProps {
   theme: Theme
-  onSeeTrade: () => void
+  onSeeTrade: () => void | Promise<void>
   onWatch?: () => void
 }
 

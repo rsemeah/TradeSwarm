@@ -1,10 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { TradeCard } from "@/components/trade-card"
 import { mockCandidates, mockRadarData } from "@/lib/mock-data"
 import { useTrade } from "@/lib/trade-context"
+import { ReceiptDrawer } from "@/components/receipt-drawer"
+import type { ReceiptData } from "@/components/receipt-drawer"
 import type { TradeCandidate } from "@/lib/types"
+import type { ProofBundle } from "@/lib/types/proof"
 
 interface TradesScreenProps {
   aiCandidate?: TradeCandidate | null
@@ -13,19 +16,35 @@ interface TradesScreenProps {
 export function TradesScreen({ aiCandidate }: TradesScreenProps) {
   const { state } = useTrade()
   const [notification, setNotification] = useState<string | null>(null)
-  
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null)
+  const [receiptOpen, setReceiptOpen] = useState(false)
+  const prevResultRef = useRef(state.lastResult)
+
   // Combine AI candidate with mock candidates, putting AI first
-  const candidates = aiCandidate 
+  const candidates = aiCandidate
     ? [aiCandidate, ...mockCandidates.filter(c => c.ticker !== aiCandidate.ticker)]
     : mockCandidates
 
   const hasGoTrades = candidates.some((c) => c.status === "GO")
 
-  const handleTradeComplete = () => {
-    if (state.lastResult) {
-      setNotification(state.lastResult.message)
-      setTimeout(() => setNotification(null), 3000)
+  // Watch for new trade results; open receipt drawer when proofBundle is present
+  useEffect(() => {
+    if (state.lastResult && state.lastResult !== prevResultRef.current) {
+      prevResultRef.current = state.lastResult
+      const data = state.lastResult.data as { proofBundle?: ProofBundle } | undefined
+      if (data?.proofBundle) {
+        setReceipt({ proofBundle: data.proofBundle, executedAt: new Date() })
+        setReceiptOpen(true)
+      }
+      if (state.lastResult.message) {
+        setNotification(state.lastResult.message)
+        setTimeout(() => setNotification(null), 4000)
+      }
     }
+  }, [state.lastResult])
+
+  const handleTradeComplete = () => {
+    // Notification and receipt handled by the useEffect above
   }
 
   if (!hasGoTrades) {
@@ -86,13 +105,20 @@ export function TradesScreen({ aiCandidate }: TradesScreenProps) {
       {/* Trade Cards */}
       <div className="space-y-4">
         {candidates.map((candidate) => (
-          <TradeCard 
-            key={candidate.ticker} 
-            candidate={candidate} 
+          <TradeCard
+            key={candidate.ticker}
+            candidate={candidate}
             onTradeComplete={handleTradeComplete}
           />
         ))}
       </div>
+
+      {/* Receipt Drawer — opens automatically after execute/simulate */}
+      <ReceiptDrawer
+        isOpen={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        receipt={receipt}
+      />
     </div>
   )
 }

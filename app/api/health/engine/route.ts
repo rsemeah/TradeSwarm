@@ -96,8 +96,8 @@ export async function GET() {
         .limit(50),
     ])
 
-    const errEvents = recentEvents?.filter((e) => e.status === "error") ?? []
-    const blockedEvents = recentEvents?.filter((e) => e.status === "blocked") ?? []
+    const errEvents = recentEvents?.filter((e: { status: string }) => e.status === "error") ?? []
+    const blockedEvents = recentEvents?.filter((e: { status: string }) => e.status === "blocked") ?? []
 
     const dbOk = !dbResult.error
     const yahooOk = yahooResult.status !== "down"

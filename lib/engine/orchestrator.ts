@@ -428,7 +428,7 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
       action: finalDecision,
       reason: lastRound.outcome.reason,
       trustScore: scoring.trustScore,
-      recommendedAmount,
+      recommendedAmount: recommendedAmount ?? null,
       bullets: primaryBullets,
     },
     engineDegraded: warnings.some(
