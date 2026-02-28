@@ -236,6 +236,7 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
 
   const risk: ProofRiskSnapshot = {
     simCount: 1000,
+    monteCarloSeed: riskSeed,
     medianPL: riskRaw.expectedReturn,
     pct10: riskRaw.worstCase,
     pct90: riskRaw.bestCase,

@@ -78,6 +78,7 @@ export interface ProofRegimeSnapshot {
 
 export interface ProofRiskSnapshot {
   simCount: number
+  monteCarloSeed: number
   medianPL: number
   pct10: number                   // 10th percentile (downside)
   pct90: number                   // 90th percentile (upside)

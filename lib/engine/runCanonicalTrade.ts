@@ -119,7 +119,7 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
     safety_mode: input.safetyMode,
     theme: input.theme,
   })
-  const randomSeed = null
+  const randomSeed = Number.isFinite(bundle.risk.monteCarloSeed) ? bundle.risk.monteCarloSeed : null
   const determinismHash = hashDeterministic({
     input_snapshot: normalizedInputSnapshot,
     market_snapshot_hash: marketSnapshotHash,
@@ -155,6 +155,7 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
         config_hash: configHash,
         determinism_hash: determinismHash,
         random_seed: randomSeed,
+        monte_carlo_seed: randomSeed,
       },
     },
   }
@@ -198,6 +199,7 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
       engine_version: canonicalBundle.metadata.determinism.engine_version,
       config_hash: canonicalBundle.metadata.determinism.config_hash,
       random_seed: canonicalBundle.metadata.determinism.random_seed,
+      monte_carlo_seed: canonicalBundle.metadata.determinism.random_seed,
     })
   }
 
