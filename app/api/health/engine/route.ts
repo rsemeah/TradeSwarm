@@ -1,43 +1,64 @@
 import { createClient } from "@/lib/supabase/server"
-import { ENGINE_STAGES } from "@/lib/engine/events"
+import { getMarketDataCircuitStatus } from "@/lib/engine/regime"
 
 async function probeYahooQuote(ticker: string) {
   const startedAt = Date.now()
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`
+  try {
+    const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`
+    const response = await fetch(url, { 
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(3000)
+    })
+    const json = await response.json()
+    const quote = json?.quoteResponse?.result?.[0]
 
-  const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } })
-  const json = await response.json()
-  const quote = json?.quoteResponse?.result?.[0]
-
-  return {
-    status: response.ok && !!quote ? "ok" : "error",
-    latencyMs: Date.now() - startedAt,
-    symbol: quote?.symbol || ticker,
-    regularMarketPrice: quote?.regularMarketPrice || null,
-    error: response.ok ? null : `HTTP ${response.status}`,
+    return {
+      status: response.ok && !!quote ? "ok" : "error",
+      latencyMs: Date.now() - startedAt,
+      symbol: quote?.symbol || ticker,
+      regularMarketPrice: quote?.regularMarketPrice || null,
+      error: response.ok ? null : `HTTP ${response.status}`,
+    }
+  } catch (error) {
+    return {
+      status: "error",
+      latencyMs: Date.now() - startedAt,
+      symbol: ticker,
+      regularMarketPrice: null,
+      error: String(error),
+    }
   }
 }
 
 async function probeYahooExpirations(ticker: string) {
   const startedAt = Date.now()
-  const url = `https://query1.finance.yahoo.com/v7/finance/options/${ticker}`
+  try {
+    const url = `https://query1.finance.yahoo.com/v7/finance/options/${ticker}`
+    const response = await fetch(url, { 
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(3000)
+    })
+    const json = await response.json()
+    const result = json?.optionChain?.result?.[0]
+    const expirations = result?.expirationDates || []
 
-  const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } })
-  const json = await response.json()
-  const result = json?.optionChain?.result?.[0]
-  const expirations = result?.expirationDates || []
-
-  return {
-    status: response.ok && expirations.length > 0 ? "ok" : "error",
-    latencyMs: Date.now() - startedAt,
-    count: expirations.length,
-    firstExpiration: expirations[0] || null,
-    error: response.ok ? null : `HTTP ${response.status}`,
+    return {
+      status: response.ok && expirations.length > 0 ? "ok" : "error",
+      latencyMs: Date.now() - startedAt,
+      count: expirations.length,
+      firstExpiration: expirations[0] || null,
+      error: response.ok ? null : `HTTP ${response.status}`,
+    }
+  } catch (error) {
+    return {
+      status: "error",
+      latencyMs: Date.now() - startedAt,
+      count: 0,
+      firstExpiration: null,
+      error: String(error),
+    }
   }
 }
-import { fetchYahooExpirations, fetchYahooQuote } from "@/lib/market-data/yahoo"
-import { getMarketDataCircuitStatus } from "@/lib/engine/regime"
-import { getCircuitState } from "@/lib/adapters/http"
 
 export async function GET() {
   const startTime = Date.now()
@@ -59,21 +80,6 @@ export async function GET() {
       .select("*", { count: "exact", head: true })
       .gte("created_at", yesterday)
 
-    const { data: successfulStageRows } = await supabase
-      .from("engine_events")
-      .select("event_type, created_at, payload")
-      .in("event_type", [...ENGINE_STAGES])
-      .order("created_at", { ascending: false })
-      .limit(400)
-
-    const lastSuccessfulStages = ENGINE_STAGES.reduce<Record<string, string | null>>((acc, stage) => {
-      const match = successfulStageRows?.find(
-        (row) => row.event_type === stage && (row.payload?.status === "success" || row.payload?.status === "degraded")
-      )
-      acc[stage] = match?.created_at || null
-      return acc
-    }, {})
-
     const successfulTrades = recentTrades?.filter((t) => t.status === "GO") || []
     const successRate = tradeCount ? (successfulTrades.length / tradeCount) * 100 : 0
 
@@ -84,16 +90,15 @@ export async function GET() {
 
     const adapterDiagnostics = {
       groq: {
-        status: process.env.GROQ_API_KEY ? "ok" : "error",
+        status: process.env.GROQ_API_KEY ? "ok" : "not_configured",
         configured: !!process.env.GROQ_API_KEY,
       },
       openai: {
-        status: process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY ? "ok" : "error",
+        status: process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY ? "ok" : "not_configured",
         configured: !!process.env.OPENAI_API_KEY || !!process.env.AI_GATEWAY_API_KEY,
       },
       supabase: {
         status: "ok",
-        recentEventRows: successfulStageRows?.length || 0,
       },
       yahoo: {
         quote: quoteProbe,
@@ -103,36 +108,9 @@ export async function GET() {
 
     const degraded = quoteProbe.status !== "ok" || expirationProbe.status !== "ok"
 
-    return Response.json({
+    const engineStatus = {
       status: degraded ? "degraded" : "operational",
       reasonCode: degraded ? "YAHOO_PROBE_DEGRADED" : null,
-      lastActivity: recentTrades?.[0]?.created_at || null,
-      timestamp: new Date().toISOString(),
-      latency: Date.now() - startTime,
-    const successfulTrades = recentTrades?.filter((t) => t.status === "GO") || []
-    const successRate = tradeCount ? (successfulTrades.length / tradeCount) * 100 : 0
-
-    let marketData = { ok: true, reason: null as string | null, quoteLatencyMs: 0, expirationsLatencyMs: 0 }
-
-    try {
-      const quoteStart = Date.now()
-      await fetchYahooQuote("NVDA")
-      marketData.quoteLatencyMs = Date.now() - quoteStart
-
-      const expStart = Date.now()
-      await fetchYahooExpirations("NVDA")
-      marketData.expirationsLatencyMs = Date.now() - expStart
-    } catch (error) {
-      marketData = {
-        ok: false,
-        reason: `Yahoo fetch failed: ${String(error)}`,
-        quoteLatencyMs: 0,
-        expirationsLatencyMs: 0,
-      }
-    }
-
-    const engineStatus = {
-      status: marketData.ok ? "operational" : "degraded",
       lastActivity: recentTrades?.[0]?.created_at || null,
       uptime: "100%",
       metrics: {
@@ -148,25 +126,17 @@ export async function GET() {
         yahooExpirations: expirationProbe,
       },
       adapterDiagnostics,
-      lastSuccessfulStages,
-      receiptsObserved: recentReceipts?.length || 0,
       components: {
         aiSwarm: {
           status: "ok",
           models: ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"],
         },
-        marketData,
         regime: {
-          status: "basic",
-        },
-        risk: {
-          status: "basic",
           status: "operational",
           circuit: getMarketDataCircuitStatus(),
         },
         risk: {
           status: "operational",
-          lastCalculation: null,
         },
       },
       circuitBreakers: {
