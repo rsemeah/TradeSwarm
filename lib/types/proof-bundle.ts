@@ -200,6 +200,7 @@ export interface DeterminismContext {
   config_hash: string
   determinism_hash: string
   random_seed: number | null
+  monte_carlo_seed?: number | null
 }
 
 export interface CanonicalProofBundle {
