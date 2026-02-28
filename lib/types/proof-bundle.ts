@@ -1,54 +1,61 @@
 export type DecisionMode = "preview" | "simulate" | "execute" | "analyze"
 
-export interface ProofEnvelope {
-  receipt_id: string
-  parent_receipt_id?: string | null
-  timestamp: string
-  actor: "system" | "user" | "admin"
-  action_type: DecisionMode
-  outcome: "GO" | "WAIT" | "NO" | "SIMULATE" | "ERROR"
+export type SafetyStatus = "ALLOWED" | "BLOCKED"
+
+export interface InputSnapshot {
+  ticker: string
+  requested_amount: number
+  balance: number
+  safety_mode: string
+  theme?: string
+  user_context?: string
 }
 
-export interface ScoringFactor {
-  key: string
-  value: number
-  note: string
+export interface MarketSnapshot {
+  quote: Record<string, unknown> | null
+  chain: Record<string, unknown> | null
+  provider_health: Record<string, unknown>
+  as_of: string
 }
 
-export interface TradeProofBundle {
-  envelope: ProofEnvelope
-  market_context: Record<string, unknown>
-  regime: Record<string, unknown> | null
-  risk: Record<string, unknown> | null
-  deliberation: Record<string, unknown>
-  scoring: {
-    trustScore: number
-    factors: ScoringFactor[]
-    ts: string
-  } | null
-  model_versions: Record<string, string>
-  provenance: {
-    data_source: string
-    delayed_data_possible: boolean
-    quote_ts?: string
-    chain_ts?: string
-  }
-  engine_timeline: Array<{
-    stage: string
-    status: "OK" | "WARN" | "ERROR"
-    durationMs?: number
-    ts: string
+export interface SafetyDecision {
+  safety_status: SafetyStatus
+  reason_code: string | null
+  reasons: string[]
+  max_size_hint: number
+}
+
+export interface ModelRound {
+  round_id: number
+  stage: string
+  providers: Array<{
+    provider: string
+    model_version: string
+    decision: string
+    confidence: number
+    reasoning: string
   }>
-  metadata?: Record<string, unknown>
+  outcome: {
+    decision: string
+    reason: string
+    consensus_strength: number
+  }
+  ts: string
 }
 
-export interface TruthSerumFeaturesV1 {
-  features_version: "features_v1"
-  symbol: string
-  side: "buy" | "sell"
-  spreadPct: number
-  liquidityProxy: number
-  regimeScore: number
-  riskDrawdown: number
-  trustScore?: number
+export interface CanonicalProofBundle {
+  version: string
+  model_provider: string
+  model_version: string
+  regime_snapshot: Record<string, unknown> | null
+  risk_snapshot: Record<string, unknown> | null
+  safety_decision: SafetyDecision
+  model_rounds: ModelRound[]
+  consensus_score: number
+  trust_score: number
+  execution_mode: Exclude<DecisionMode, "analyze">
+  timestamp: string
+  input_snapshot: InputSnapshot
+  market_snapshot: MarketSnapshot
+  metadata?: Record<string, unknown>
 }
