@@ -1,25 +1,28 @@
-export interface CalendarEvent {
-  type: 'FOMC' | 'CPI' | 'NFP'
-  date: string
+import macroCalendar from './macroCalendar.json'
+
+interface MacroFlags {
+  earnings_within_dte: boolean
+  fomc_within_5d: boolean
+  cpi_within_3d: boolean
+  nfp_within_3d: boolean
 }
 
-const CALENDAR: CalendarEvent[] = [
-  { type: 'FOMC', date: '2026-03-18' },
-  { type: 'CPI', date: '2026-03-12' },
-  { type: 'NFP', date: '2026-03-06' },
-]
+function daysUntil(date: string): number {
+  const target = new Date(date)
+  const now = new Date()
+  return Math.ceil((target.getTime() - now.getTime()) / 86_400_000)
+}
 
-const daysTo = (date: string) => Math.ceil((new Date(date).getTime() - Date.now()) / 86_400_000)
+export function getMacroFlags(earningsDate?: string, dte = 30): MacroFlags {
+  const inWindow = (date: string, maxDays: number) => {
+    const delta = daysUntil(date)
+    return delta >= 0 && delta <= maxDays
+  }
 
-export function macroPenalty(): { fomc: boolean; cpi: boolean; nfp: boolean; penalty: number } {
-  let penalty = 0
-  const fomc = CALENDAR.some((e) => e.type === 'FOMC' && daysTo(e.date) <= 5 && daysTo(e.date) >= 0)
-  const cpi = CALENDAR.some((e) => e.type === 'CPI' && daysTo(e.date) <= 3 && daysTo(e.date) >= 0)
-  const nfp = CALENDAR.some((e) => e.type === 'NFP' && daysTo(e.date) <= 3 && daysTo(e.date) >= 0)
-
-  if (fomc) penalty += 0.1
-  if (cpi) penalty += 0.08
-  if (nfp) penalty += 0.06
-
-  return { fomc, cpi, nfp, penalty: Math.min(0.25, penalty) }
+  return {
+    earnings_within_dte: Boolean(earningsDate && inWindow(earningsDate, dte)),
+    fomc_within_5d: (macroCalendar.fomc as string[]).some((d) => inWindow(d, 5)),
+    cpi_within_3d: (macroCalendar.cpi as string[]).some((d) => inWindow(d, 3)),
+    nfp_within_3d: (macroCalendar.nfp as string[]).some((d) => inWindow(d, 3)),
+  }
 }
