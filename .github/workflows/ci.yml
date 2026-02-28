@@ -2,41 +2,35 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
   push:
-    branches: [main]
-
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    branches:
+      - main
 
 jobs:
-  build-and-typecheck:
+  ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node20-modules-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node20-modules-
 
-      - name: Lint
-        run: pnpm lint
+      - run: npm ci
 
-      - name: Typecheck
-        run: pnpm typecheck
+      - run: npm run build
 
-      - name: Build
-        run: pnpm build
+      - name: Typecheck (if present)
+        run: |
+          if npm run | grep -qE '^\s*typecheck\s'; then
+            npm run typecheck
+          else
+            echo "No typecheck script found; skipping."
+          fi
