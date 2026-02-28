@@ -1,0 +1,67 @@
+[
+  {
+    "id": "t1",
+    "created_at": "2026-01-01T14:30:00Z",
+    "strategy_type": "credit_spread",
+    "engine_score_at_entry": 82,
+    "regime_at_entry": "bullish_low_vol",
+    "realized_pnl": 120,
+    "max_risk": 200,
+    "mode": "paper",
+    "kelly_fraction": 0.08,
+    "fees": 2,
+    "slippage": 1
+  },
+  {
+    "id": "t2",
+    "created_at": "2026-01-02T14:30:00Z",
+    "strategy_type": "iron_condor",
+    "engine_score_at_entry": 40,
+    "regime_at_entry": "sideways",
+    "realized_pnl": -100,
+    "max_risk": 200,
+    "mode": "paper",
+    "kelly_fraction": 0.09,
+    "fees": 2,
+    "slippage": 2
+  },
+  {
+    "id": "t3",
+    "created_at": "2026-01-03T14:30:00Z",
+    "strategy_type": "credit_spread",
+    "engine_score_at_entry": 68,
+    "regime_at_entry": "bullish_low_vol",
+    "realized_pnl": 80,
+    "max_risk": 200,
+    "mode": "paper",
+    "kelly_fraction": 0.07,
+    "fees": 1,
+    "slippage": 1
+  },
+  {
+    "id": "t4",
+    "created_at": "2026-01-04T14:30:00Z",
+    "strategy_type": "debit_spread",
+    "engine_score_at_entry": 55,
+    "regime_at_entry": "bearish_high_vol",
+    "realized_pnl": -140,
+    "max_risk": 200,
+    "mode": "paper",
+    "kelly_fraction": 0.1,
+    "fees": 2,
+    "slippage": 3
+  },
+  {
+    "id": "t5",
+    "created_at": "2026-01-05T14:30:00Z",
+    "strategy_type": "credit_spread",
+    "engine_score_at_entry": 88,
+    "regime_at_entry": "bullish_low_vol",
+    "realized_pnl": 150,
+    "max_risk": 200,
+    "mode": "paper",
+    "kelly_fraction": 0.06,
+    "fees": 2,
+    "slippage": 1
+  }
+]
