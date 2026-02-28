@@ -2,7 +2,6 @@ import { generateText, Output } from "ai"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { detectRegime, regimeToContext } from "./regime"
-import { simulateRisk, riskToContext } from "./risk"
 import { requireAnyRuntimeEnv } from "@/lib/env/server-runtime"
 import { deriveSeedFromString, simulateRisk, riskToContext } from "./risk"
 
@@ -196,6 +195,7 @@ export async function runTradeSwarm(params: RunTradeSwarmParams): Promise<{
   const safetyMode = String(preferences?.safety_mode || "training_wheels")
   const estimatedAmount = params.trade?.amountDollars || balance * 0.015
   const useSwarm = params.mode === "preview" ? false : (params.useSwarm ?? true)
+  const requestId = `legacy-${ticker}-${startedAt}`
 
   const stages: TradeSwarmProofBundle["stages"] = []
 
