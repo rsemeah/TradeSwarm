@@ -26,3 +26,16 @@ If checks fail due to missing modules, add deterministic type-safe stubs instead
 ## Dependabot policy
 - Dependency-only PRs with green CI are recommended for auto-merge (squash).
 - Security updates are prioritized.
+
+## Repo Guardian authorization
+Codex is authorized to:
+- Fix build errors.
+- Stub missing modules deterministically.
+- Correct import paths.
+- Add environment validation helpers.
+
+Codex may NOT:
+- Change trading logic.
+- Remove safety enforcement.
+- Modify proof-bundle structure.
+- Disable CI gates.
