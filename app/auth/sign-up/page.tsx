@@ -65,47 +65,53 @@ export default function SignUpPage() {
 
         <div className="rounded-xl border border-[#1f1f1f] bg-[#141414] p-6">
           <form onSubmit={handleSignUp} className="flex flex-col gap-4" suppressHydrationWarning>
-            <div className="flex flex-col gap-2" suppressHydrationWarning>
+            <div className="flex flex-col gap-2">
               <label htmlFor="email" className="text-sm font-medium text-white">
                 Email
               </label>
-              <input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-12 rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
-              />
+              <div suppressHydrationWarning>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
+                />
+              </div>
             </div>
 
-            <div className="flex flex-col gap-2" suppressHydrationWarning>
+            <div className="flex flex-col gap-2">
               <label htmlFor="password" className="text-sm font-medium text-white">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-12 rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
-              />
+              <div suppressHydrationWarning>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
+                />
+              </div>
             </div>
 
-            <div className="flex flex-col gap-2" suppressHydrationWarning>
+            <div className="flex flex-col gap-2">
               <label htmlFor="confirm-password" className="text-sm font-medium text-white">
                 Confirm Password
               </label>
-              <input
-                id="confirm-password"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="h-12 rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
-              />
+              <div suppressHydrationWarning>
+                <input
+                  id="confirm-password"
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
+                />
+              </div>
             </div>
 
             {error && (
