@@ -45,9 +45,11 @@ export function SniperOverlay({ candidate, onConfirm, onCancel, isSimulation = f
   }, [isHolding, locked, onConfirm])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 z-40 bg-black/90 backdrop-blur-sm" />
+
       {/* Crosshair Container */}
-      <div className="relative flex h-[320px] w-[320px] items-center justify-center">
+      <div className="relative z-50 flex h-[320px] w-[320px] items-center justify-center">
         {/* Outer Ring */}
         <div className="absolute inset-0 rounded-full border-2 border-accent/30 animate-pulse" />
         
@@ -117,7 +119,7 @@ export function SniperOverlay({ candidate, onConfirm, onCancel, isSimulation = f
       </div>
       
       {/* Bottom Controls */}
-      <div className="absolute bottom-16 left-0 right-0 flex flex-col items-center gap-4 px-6">
+      <div className="absolute bottom-16 left-0 right-0 z-50 flex flex-col items-center gap-4 px-6">
         {/* Confirm Button */}
         <button
           onMouseDown={() => locked && setIsHolding(true)}
@@ -147,14 +149,14 @@ export function SniperOverlay({ candidate, onConfirm, onCancel, isSimulation = f
       </div>
       
       {/* Info Panel */}
-      <div className="absolute left-4 top-4 space-y-1 text-[10px] font-mono text-muted-foreground">
+      <div className="absolute left-4 top-4 z-50 space-y-1 text-[10px] font-mono text-muted-foreground">
         <div>STRATEGY: {candidate.strategy}</div>
         <div>TRUST: {candidate.trustScore}/100</div>
         <div>WIN%: {candidate.winLikelihoodPct}%</div>
       </div>
       
       {/* Timestamp */}
-      <div className="absolute right-4 top-4 font-mono text-[10px] text-muted-foreground">
+      <div className="absolute right-4 top-4 z-50 font-mono text-[10px] text-muted-foreground">
         {new Date().toLocaleTimeString("en-US", { hour12: false })} ET
       </div>
     </div>
