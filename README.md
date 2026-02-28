@@ -29,7 +29,8 @@ app/api/
 │   └── simulate/               # Monte Carlo simulation
 ├── internal/
 │   ├── ops/calibration-metrics # Calibration dashboard
-│   └── ops/replay/[id]         # Deterministic replay
+│   ├── ops/replay/[id]         # Deterministic replay
+│   └── ops/validation-report   # Institutional validation report
 ├── health/                     # System + engine health
 └── learn-why/                  # AI explainer
 
@@ -76,6 +77,17 @@ Every receipt includes:
 - `determinism_hash` - Hash of normalized inputs + snapshot + config
 - `engine_version` - For version-aware replay
 
+
+### Institutional Validation Gates
+Execution is fail-closed when governance checks are not met. `/api/trade/execute` now evaluates:
+- empirical trade count (`MIN_EMPIRICAL_TRADES`, default `30`)
+- deterministic receipt coverage
+- replay mismatch drift
+- operator journal completeness
+- rolling drawdown and ruin probability bounds
+
+Operators can enforce or release freeze via the `system_controls` table (`trade_engine_frozen`). Validation snapshots are exposed at `/api/internal/ops/validation-report`.
+
 ### Safety Evaluator
 Hard blocks for:
 - Spread > threshold
@@ -95,6 +107,7 @@ Hard blocks for:
 | `/api/trade/simulate` | POST | Monte Carlo simulation |
 | `/api/internal/ops/replay/[id]` | POST | Replay a receipt |
 | `/api/internal/ops/calibration-metrics` | GET | Calibration dashboard |
+| `/api/internal/ops/validation-report` | GET | Validation + freeze recommendation |
 | `/api/internal/jobs/outcome-tracker` | POST | Track trade outcomes |
 
 ## Database Schema
@@ -124,6 +137,8 @@ OPENAI_API_KEY=               # Optional direct OpenAI key
 INTERNAL_JOBS_TOKEN=          # Protects internal cron/ops routes
 REPLAY_COVERAGE_THRESHOLD=0   # Block execute if coverage < threshold
 REPLAY_MISMATCH_THRESHOLD=1   # Block execute if mismatch rate > threshold
+MIN_EMPIRICAL_TRADES=30       # Freeze execute until this trade count exists
+MAX_RUIN_PROBABILITY=0.05     # Damp sizing / freeze when exceeded
 ```
 
 ## Development
