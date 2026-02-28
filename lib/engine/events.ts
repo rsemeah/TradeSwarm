@@ -72,7 +72,7 @@ export interface StageEventInput {
   details?: Record<string, unknown>
 }
 
-export async function recordStageEvent(supabase: { from: (table: string) => { insert: (payload: Record<string, unknown>) => Promise<{ error: { message?: string } | null }> } }, input: StageEventInput) {
+export async function recordStageEvent(supabase: { from: (table: string) => { insert: (payload: Record<string, unknown>) => PromiseLike<{ error: { message?: string } | null }> } }, input: StageEventInput) {
   const { error } = await supabase.from("engine_events").insert({
     user_id: input.userId ?? null,
     event_type: input.stage,

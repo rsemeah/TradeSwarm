@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { recordStageEvent } from "@/lib/engine/events"
 import { runEngineAnalysis } from "@/lib/engine"
 import { calculateCredibilityScore } from "@/lib/scoring/credibility"
+import { requireAnyRuntimeEnv } from "@/lib/env/server-runtime"
 
 // Schema for trade analysis output
 const TradeAnalysisSchema = z.object({
@@ -104,6 +105,7 @@ export async function POST(req: Request) {
   const requestStartedAt = Date.now()
 
   try {
+    requireAnyRuntimeEnv("api/analyze", ["GROQ_API_KEY", "OPENAI_API_KEY", "AI_GATEWAY_API_KEY"])
     const supabase = await createClient()
     const startedAt = Date.now()
     const { ticker, theme, marketContext, useSwarm = true } = await req.json()

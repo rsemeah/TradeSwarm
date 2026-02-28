@@ -2,7 +2,8 @@ import { generateText, Output } from "ai"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { detectRegime, regimeToContext } from "./regime"
-import { simulateRisk, riskToContext } from "./risk"
+import { requireAnyRuntimeEnv } from "@/lib/env/server-runtime"
+import { deriveSeedFromString, simulateRisk, riskToContext } from "./risk"
 
 const DecisionSchema = z.object({
   ticker: z.string(),
@@ -194,6 +195,7 @@ export async function runTradeSwarm(params: RunTradeSwarmParams): Promise<{
   const safetyMode = String(preferences?.safety_mode || "training_wheels")
   const estimatedAmount = params.trade?.amountDollars || balance * 0.015
   const useSwarm = params.mode === "preview" ? false : (params.useSwarm ?? true)
+  const requestId = `legacy-${ticker}-${startedAt}`
 
   const stages: TradeSwarmProofBundle["stages"] = []
 
@@ -220,12 +222,14 @@ export async function runTradeSwarm(params: RunTradeSwarmParams): Promise<{
   })
 
   const baseTrustScore = 50
+  const riskSeed = deriveSeedFromString(requestId)
   const risk = simulateRisk({
     ticker,
     amount: estimatedAmount,
     balance,
     trustScore: baseTrustScore,
     regime,
+    seed: riskSeed,
     strategy: normalizeStrategy(params.trade?.strategy),
   })
   stages.push({
@@ -236,6 +240,7 @@ export async function runTradeSwarm(params: RunTradeSwarmParams): Promise<{
   const combinedContext = `${marketContext}\n${regimeToContext(regime)}\n${riskToContext(risk)}`
 
   const hasOpenAI = !!process.env.AI_GATEWAY_API_KEY || !!process.env.OPENAI_API_KEY
+  requireAnyRuntimeEnv("runTradeSwarm", ["GROQ_API_KEY", "OPENAI_API_KEY", "AI_GATEWAY_API_KEY"])
   const modelPlan = useSwarm && hasOpenAI
     ? ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"]
     : ["groq/llama-3.3-70b-versatile"]
