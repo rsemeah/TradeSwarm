@@ -97,6 +97,7 @@ Provide:
 
   return result.output
 }
+import { runTradeSwarm } from "@/lib/engine"
 
 export async function POST(req: Request) {
   try {
@@ -107,50 +108,13 @@ export async function POST(req: Request) {
       return Response.json({ error: "Ticker is required" }, { status: 400 })
     }
 
-    // Models to use - Groq is free and primary, OpenAI as second opinion
-    // Check which API keys are available
-    const hasOpenAI = !!process.env.AI_GATEWAY_API_KEY || !!process.env.OPENAI_API_KEY
-    
-    // Use Groq + OpenAI for dual-model consensus (both fast and accurate)
-    const models = useSwarm && hasOpenAI
-      ? ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"]
-      : ["groq/llama-3.3-70b-versatile"] // Groq-only mode (free tier)
-
-    // Run analyses in parallel
-    const results = await Promise.all(
-      models.map((model) =>
-        analyzeWithModel(model, ticker, theme || "General", marketContext || "Normal market conditions")
-      )
-    )
-
-    // Filter successful analyses
-    const successfulAnalyses = results.filter((r) => r.analysis !== null) as {
-      model: string
-      analysis: z.infer<typeof TradeAnalysisSchema>
-    }[]
-
-    if (successfulAnalyses.length === 0) {
-      return Response.json(
-        { error: "All models failed to analyze", details: results.map((r) => r.error) },
-        { status: 500 }
-      )
-    }
-
-    // Get consensus if multiple models succeeded
-    let finalAnalysis: z.infer<typeof TradeAnalysisSchema>
-    let consensus: z.infer<typeof SwarmConsensusSchema> | null = null
-
-    if (successfulAnalyses.length > 1 && useSwarm) {
-      consensus = await getSwarmConsensus(successfulAnalyses)
-      // Use the analysis from the model that matches consensus, or the highest trust score
-      const matchingAnalysis = successfulAnalyses.find(
-        (a) => a.analysis.status === consensus!.finalDecision
-      )
-      finalAnalysis = matchingAnalysis?.analysis || successfulAnalyses[0].analysis
-      finalAnalysis.trustScore = consensus.confidenceScore
-    } else {
-      finalAnalysis = successfulAnalyses[0].analysis
-    }
+    const { proofBundle } = await runTradeSwarm({
+      mode: "analyze",
+      ticker,
+      theme,
+      marketContext,
+      useSwarm,
+    })
 
     const engineAnalysis = await runEngineAnalysis(ticker, 150, 10000, finalAnalysis.trustScore)
     const uniqueDecisions = new Set(successfulAnalyses.map((a) => a.analysis.status))
@@ -227,6 +191,28 @@ export async function POST(req: Request) {
         finalVerdict: consensus?.finalDecision || finalAnalysis.status,
         consensusStrength: consensus?.confidenceScore || finalAnalysis.trustScore,
       } : undefined,
+      analysis: proofBundle.decision,
+      consensus: proofBundle.consensus,
+      modelResults: proofBundle.modelResults,
+      aiConsensus: {
+        groq: proofBundle.modelResults.find((m) => m.model.includes("groq"))
+          ? {
+              decision: proofBundle.modelResults.find((m) => m.model.includes("groq"))!.status,
+              confidence: proofBundle.modelResults.find((m) => m.model.includes("groq"))!.trustScore,
+              reasoning: proofBundle.modelResults.find((m) => m.model.includes("groq"))!.reasoning,
+            }
+          : undefined,
+        openai: proofBundle.modelResults.find((m) => m.model.includes("openai"))
+          ? {
+              decision: proofBundle.modelResults.find((m) => m.model.includes("openai"))!.status,
+              confidence: proofBundle.modelResults.find((m) => m.model.includes("openai"))!.trustScore,
+              reasoning: proofBundle.modelResults.find((m) => m.model.includes("openai"))!.reasoning,
+            }
+          : undefined,
+        finalVerdict: proofBundle.consensus?.finalDecision || proofBundle.decision.status,
+        consensusStrength: proofBundle.consensus?.confidenceScore || proofBundle.decision.trustScore,
+      },
+      proofBundle,
     })
   } catch (error) {
     console.error("Analysis error:", error)

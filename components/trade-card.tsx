@@ -166,6 +166,7 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
   const [auditView, setAuditView] = useState<"simple" | "advanced">("simple")
   const [showSniper, setShowSniper] = useState<"execute" | "simulate" | null>(null)
   const [showLearnWhy, setShowLearnWhy] = useState(false)
+  const [showReasoning, setShowReasoning] = useState(false)
   const { state, executeTrade, simulateTrade } = useTrade()
 
   const isGo = candidate.status === "GO"
@@ -286,14 +287,22 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
       </div>
 
       {/* Receipt Link */}
-      {!isNo && (
+      <div className="flex flex-wrap items-center gap-3">
+        {!isNo && (
+          <button
+            onClick={() => setShowAudit(!showAudit)}
+            className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {showAudit ? "✕ Close receipt" : "See receipt ›"}
+          </button>
+        )}
         <button
-          onClick={() => setShowAudit(!showAudit)}
+          onClick={() => setShowReasoning(!showReasoning)}
           className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
         >
-          {showAudit ? "✕ Close receipt" : "See receipt ›"}
+          {showReasoning ? "✕ Close reasoning" : "Reasoning drawer ›"}
         </button>
-      )}
+      </div>
 
       {/* Audit Panel */}
       {showAudit && (
@@ -324,6 +333,54 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
             </div>
           </div>
           <AuditPanel candidate={candidate} view={auditView} />
+        </div>
+      )}
+
+      {showReasoning && (
+        <div className="mt-4 space-y-3 rounded-lg border border-border bg-[#0f0f0f] p-3">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reasoning Drawer</p>
+
+          <div>
+            <p className="mb-2 text-[10px] font-bold text-muted-foreground">Factor Contributions</p>
+            <div className="space-y-2">
+              {[
+                { name: "Regime alignment", value: Math.round(candidate.auditAdvanced.regimeScore * 100), polarity: "positive" },
+                { name: "Liquidity quality", value: Math.round(candidate.auditAdvanced.liquidityScore * 100), polarity: "positive" },
+                { name: "Risk friction", value: Math.max(5, 100 - candidate.trustScore), polarity: "negative" },
+              ].map((factor) => (
+                <div key={factor.name}>
+                  <div className="mb-1 flex items-center justify-between text-[11px]">
+                    <span className="text-muted-foreground">{factor.name}</span>
+                    <span className={factor.polarity === "positive" ? "text-accent" : "text-warning"}>{factor.value}%</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full ${factor.polarity === "positive" ? "bg-accent" : "bg-warning"}`}
+                      style={{ width: `${Math.min(factor.value, 100)}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[10px] font-bold text-muted-foreground">Feed Evidence</p>
+            <ul className="space-y-1 text-xs text-muted-foreground">
+              <li>• Macro feed confidence maps to trust score ({candidate.trustScore}/100).</li>
+              <li>• Strategy context: {candidate.strategy}.</li>
+              <li>• Primary rationale: {candidate.bullets.why}</li>
+            </ul>
+          </div>
+
+          <div>
+            <p className="mb-2 text-[10px] font-bold text-muted-foreground">Timeline Deltas</p>
+            <div className="space-y-1 text-xs">
+              <p className="text-muted-foreground">T-15m: Regime score improved to {(candidate.auditAdvanced.regimeScore * 100).toFixed(0)}.</p>
+              <p className="text-muted-foreground">T-8m: Liquidity score moved to {(candidate.auditAdvanced.liquidityScore * 100).toFixed(0)}.</p>
+              <p className="text-foreground">T-0m: Final status resolved to {candidate.status}.</p>
+            </div>
+          </div>
         </div>
       )}
       </div>
