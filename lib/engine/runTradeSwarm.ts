@@ -2,6 +2,8 @@ import { generateText, Output } from "ai"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { detectRegime, regimeToContext } from "./regime"
+import { simulateRisk, riskToContext } from "./risk"
+import { requireAnyRuntimeEnv } from "@/lib/env/server-runtime"
 import { deriveSeedFromString, simulateRisk, riskToContext } from "./risk"
 
 const DecisionSchema = z.object({
@@ -238,6 +240,7 @@ export async function runTradeSwarm(params: RunTradeSwarmParams): Promise<{
   const combinedContext = `${marketContext}\n${regimeToContext(regime)}\n${riskToContext(risk)}`
 
   const hasOpenAI = !!process.env.AI_GATEWAY_API_KEY || !!process.env.OPENAI_API_KEY
+  requireAnyRuntimeEnv("runTradeSwarm", ["GROQ_API_KEY", "OPENAI_API_KEY", "AI_GATEWAY_API_KEY"])
   const modelPlan = useSwarm && hasOpenAI
     ? ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"]
     : ["groq/llama-3.3-70b-versatile"]

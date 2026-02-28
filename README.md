@@ -109,14 +109,19 @@ Migrations in `scripts/`:
 
 ## Environment Variables
 
+Vercel deployment/runtime requires these variables for API routes:
+
 ```env
 # Required
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-GROQ_API_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+GROQ_API_KEY=                 # Model provider key used by default
 
 # Optional
-AI_GATEWAY_API_KEY=           # Enables OpenAI/Anthropic
+AI_GATEWAY_API_KEY=           # Enables OpenAI gateway path
+OPENAI_API_KEY=               # Optional direct OpenAI key
+INTERNAL_JOBS_TOKEN=          # Protects internal cron/ops routes
 REPLAY_COVERAGE_THRESHOLD=0   # Block execute if coverage < threshold
 REPLAY_MISMATCH_THRESHOLD=1   # Block execute if mismatch rate > threshold
 ```
