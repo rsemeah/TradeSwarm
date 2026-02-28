@@ -1,29 +1,41 @@
-const CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/chart'
-
-function stdev(values: number[]): number {
-  const mean = values.reduce((a, b) => a + b, 0) / values.length
-  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / values.length
-  return Math.sqrt(variance)
+export interface Rv20Result {
+  series: number[]
+  low: number
+  high: number
+  current: number
+  sufficient: boolean
 }
 
-export async function fetchRv20(symbol: string): Promise<{ rv20: number | null; insufficient: boolean }> {
-  const res = await fetch(`${CHART_URL}/${encodeURIComponent(symbol)}?range=3mo&interval=1d`, {
-    cache: 'no-store',
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-  })
-
-  if (!res.ok) return { rv20: null, insufficient: true }
-  const json = await res.json()
-  const closes: number[] = json?.chart?.result?.[0]?.indicators?.quote?.[0]?.close?.filter((n: unknown) => typeof n === 'number') ?? []
-
-  if (closes.length < 21) return { rv20: null, insufficient: true }
-
-  const returns: number[] = []
-  for (let i = closes.length - 20; i < closes.length; i += 1) {
-    const prev = closes[i - 1]
-    const cur = closes[i]
-    returns.push(Math.log(cur / prev))
+export function computeRv20(closes: number[]): Rv20Result {
+  if (closes.length < 21) {
+    return { series: [], low: 0, high: 0, current: 0.2, sufficient: false }
   }
 
-  return { rv20: stdev(returns) * Math.sqrt(252), insufficient: false }
+  const returns: number[] = []
+  for (let i = 1; i < closes.length; i += 1) {
+    returns.push(Math.log(closes[i] / closes[i - 1]))
+  }
+
+  const series: number[] = []
+  for (let i = 20; i <= returns.length; i += 1) {
+    const window = returns.slice(i - 20, i)
+    const mean = window.reduce((a, b) => a + b, 0) / window.length
+    const variance = window.reduce((a, b) => a + (b - mean) ** 2, 0) / window.length
+    const rv = Math.sqrt(variance) * Math.sqrt(252)
+    series.push(rv)
+  }
+
+  const low = Math.min(...series)
+  const high = Math.max(...series)
+  const current = series[series.length - 1]
+
+  return { series, low, high, current, sufficient: series.length >= 30 }
+}
+
+export function computeIvRvPosition(currentIv: number, rv20: Rv20Result): { position: number; sufficient: boolean } {
+  if (!rv20.sufficient || rv20.high === rv20.low) {
+    return { position: 0.5, sufficient: false }
+  }
+  const position = (currentIv - rv20.low) / (rv20.high - rv20.low)
+  return { position: Math.max(0, Math.min(1, position)), sufficient: true }
 }

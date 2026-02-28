@@ -1,115 +1,46 @@
 export type Strategy = 'PCS' | 'CCS' | 'CDS'
-
 export type Tier = 'A' | 'B' | 'C'
+export type Regime = 'TRENDING' | 'HIGH_VOL' | 'LOW_VOL' | 'CHOPPY' | 'MEAN_REVERT'
 
-export interface UniverseTicker {
-  symbol: string
-  tier: Tier
+export interface ScanConfig {
+  watchlist?: string[]
+  catalyst_mode: boolean
+  force_refresh: boolean
+  account_size: number
+  max_risk: number
+  hard_cap: number
 }
 
-export interface OptionLeg {
-  strike: number
-  bid: number
-  ask: number
-  mid: number
-  iv: number
-  volume: number
-  openInterest: number
-  delta?: number
-}
-
-export interface Candidate {
-  id: string
+export interface RawCandidate {
   ticker: string
-  tier: Tier
+  underlying_price: number
   strategy: Strategy
+  tier: Tier
   dte: number
-  underlyingPrice: number
-  spreadWidth: number
-  shortLeg: OptionLeg
-  longLeg: OptionLeg
-  iv: number
-  rv20: number | null
-  ivVsRv: number
-  pop: number
-  liquidity: number
-  riskBudget: number
-  hardCap: number
+  expiry_date: string
+  spread_width: number
+  short_strike: number
+  long_strike: number
+  short_mid_ps: number
+  long_mid_ps: number
+  short_bid: number
+  short_ask: number
+  long_bid: number
+  long_ask: number
+  short_oi: number
+  long_oi: number
+  short_vol: number
+  long_vol: number
+  short_iv: number
+  long_iv: number
+  short_delta: number | null
+  long_delta: number | null
+  earnings_date: string | null
 }
 
-export interface ScoreInputs {
-  ror: number
-  pop: number
-  ivVsRv: number
-  liquidity: number
-  eventPenalty: number
-  regimeBonus: number
+export interface FilterResult {
+  passed: boolean
+  reasons: string[]
 }
 
-export interface ScoreBreakdown {
-  raw: number
-  eventPenalty: number
-  regimeBonus: number
-  total: number
-  display: number
-  weights: {
-    ror: number
-    pop: number
-    ivVsRv: number
-    liquidity: number
-  }
-}
-
-export interface StressPoint {
-  price: number
-  pnl: number
-  label: 'Win' | 'Flat' | 'Loss'
-}
-
-export interface StressResult {
-  sigma: number
-  source: 'contract_iv' | 'rv20_proxy' | 'fallback_0_20'
-  scenarios: Record<'up_1s' | 'down_1s' | 'up_2s' | 'down_2s', StressPoint>
-}
-
-export interface MacroFlags {
-  fomc: boolean
-  cpi: boolean
-  nfp: boolean
-  earnings: boolean
-}
-
-export interface NewsImpact {
-  sentiment: number
-  penalty: number
-  macroFlags: MacroFlags
-  headlines: string[]
-}
-
-export interface TruthSerumFlags {
-  delta_approximated: boolean
-  iv_history_insufficient: boolean
-  sigma_source: StressResult['source']
-  catalyst_mode_trade: 'A'
-}
-
-export interface RankedDeal {
-  candidate: Candidate
-  score: ScoreBreakdown
-  ror: number
-  maxLoss: number
-  maxProfit: number
-  contracts: number
-  stress: StressResult
-  news: NewsImpact
-  truthSerum: TruthSerumFlags
-}
-
-export interface ScanResult {
-  scanId: string
-  generatedAt: string
-  ttlSeconds: number
-  empty: boolean
-  reason?: string
-  deals: RankedDeal[]
-}
+export type FilterCounts = Record<string, number>
