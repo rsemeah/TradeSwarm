@@ -9,6 +9,9 @@ export type { RegimeSnapshot, Trend, Volatility, Momentum } from "./regime"
 export { simulateRisk, riskToContext } from "./risk"
 export type { RiskSnapshot } from "./risk"
 
+export { runTradeSwarm } from "./runTradeSwarm"
+export type { TradeSwarmProofBundle, RunTradeSwarmMode } from "./runTradeSwarm"
+
 import { detectRegime, regimeToContext } from "./regime"
 import { simulateRisk, riskToContext } from "./risk"
 import type { RegimeSnapshot } from "./regime"

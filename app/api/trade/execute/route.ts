@@ -1,9 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
+import { runTradeSwarm } from "@/lib/engine"
 
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
       return Response.json({ error: "Unauthorized" }, { status: 401 })
@@ -23,12 +26,12 @@ export async function POST(req: Request) {
       engineVersion,
       schemaVersion,
     } = await req.json()
+    const { ticker, theme, marketContext, trade, proofBundle } = await req.json()
 
-    if (!trade) {
-      return Response.json({ error: "Trade data is required" }, { status: 400 })
+    if (!proofBundle && !ticker && !trade?.ticker) {
+      return Response.json({ error: "Ticker or proofBundle is required" }, { status: 400 })
     }
 
-    // Get user preferences
     const { data: preferences } = await supabase
       .from("user_preferences")
       .select("*")
@@ -38,7 +41,6 @@ export async function POST(req: Request) {
     const safetyMode = preferences?.safety_mode || "training_wheels"
     const maxTradesPerDay = safetyMode === "training_wheels" ? 1 : safetyMode === "normal" ? 3 : 10
 
-    // Check daily limit
     const today = new Date().toISOString().split("T")[0]
     const { count: tradesToday } = await supabase
       .from("trades")
@@ -119,6 +121,11 @@ export async function POST(req: Request) {
         executed_at: executedAt,
         created_at: executedAt,
       },
+      ai_consensus: aiConsensus,
+      regime_snapshot: regime,
+      risk_snapshot: risk,
+      scoring: trade.scoring || null,
+      executed_at: new Date().toISOString(),
     }
 
     await supabase.from("trade_receipts").insert(receiptRecord)
@@ -135,13 +142,22 @@ export async function POST(req: Request) {
       paper_trades_completed: (stats?.paper_trades_completed || 0) + 1,
       total_trades: (stats?.total_trades || 0) + 1,
       updated_at: new Date().toISOString(),
+    const { proofBundle: canonicalProofBundle, persisted } = await runTradeSwarm({
+      mode: "execute",
+      ticker: ticker || trade?.ticker,
+      theme,
+      marketContext,
+      trade,
+      existingProofBundle: proofBundle,
+      userId: user.id,
     })
 
     return Response.json({
       success: true,
-      trade: insertedTrade,
-      receipt: receiptRecord,
-      message: `Executed: ${trade.ticker} for $${trade.amountDollars}`,
+      trade: persisted?.trade,
+      receipt: persisted?.receipt,
+      message: `Executed: ${canonicalProofBundle.decision.ticker} for $${canonicalProofBundle.decision.recommendedAmount ?? 0}`,
+      proofBundle: canonicalProofBundle,
     })
   } catch (error) {
     console.error("Execute error:", error)
