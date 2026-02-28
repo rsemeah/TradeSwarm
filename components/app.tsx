@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useEffect, useMemo, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import type { TabId, TradeCandidate } from "@/lib/types"
 import { TabBar } from "@/components/tab-bar"
 import { RadarScreen } from "@/components/screens/radar-screen"
@@ -31,6 +31,10 @@ function AppContent() {
   const [middlePaneWidth, setMiddlePaneWidth] = useState(44)
   const { user, loading } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  
+  // Demo mode: ?demo=1 shows mock data explicitly
+  const isDemoMode = searchParams.get("demo") === "1" || searchParams.get("demo") === "true"
 
   const candidates = useMemo(
     () =>
@@ -71,9 +75,22 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-background">
       <main className="hidden min-h-screen p-4 lg:block">
-        <div className="mb-3 rounded-lg border border-border bg-card/70 px-4 py-3">
-          <h1 className="text-sm font-semibold text-foreground">TradeSwarm Pro Workspace</h1>
-          <p className="text-xs text-muted-foreground">Desktop-first multi-pane workspace with resizable panes and feed view modes.</p>
+        <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-card/70 px-4 py-3">
+          <div>
+            <h1 className="text-sm font-semibold text-foreground">TradeSwarm Pro Workspace</h1>
+            <p className="text-xs text-muted-foreground">Desktop-first multi-pane workspace with resizable panes and feed view modes.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {isDemoMode && (
+              <div className="flex items-center gap-2 rounded-md border border-muted-foreground/30 bg-muted px-3 py-1.5">
+                <span className="font-mono text-xs font-medium text-muted-foreground">DEMO DATA</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 rounded-md border border-warning/30 bg-warning/10 px-3 py-1.5">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-warning" />
+              <span className="font-mono text-xs font-medium text-warning">PAPER MODE</span>
+            </div>
+          </div>
         </div>
 
         <div
@@ -239,8 +256,16 @@ function AppContent() {
           {activeTab === "money" && <MoneyScreen />}
         </main>
 
-        <div className="fixed bottom-16 left-0 right-0 py-2 text-center">
-          <p className="text-[10px] text-muted-foreground">Practice mode — no real money</p>
+        <div className="fixed bottom-16 left-0 right-0 flex justify-center gap-2 py-2">
+          {isDemoMode && (
+            <div className="flex items-center gap-1.5 rounded-full border border-muted-foreground/30 bg-muted px-2 py-1">
+              <span className="font-mono text-[10px] font-medium text-muted-foreground">DEMO</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5 rounded-full border border-warning/30 bg-warning/10 px-3 py-1">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-warning" />
+            <span className="font-mono text-[10px] font-medium text-warning">PAPER MODE</span>
+          </div>
         </div>
 
         <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -253,7 +278,13 @@ export function App() {
   return (
     <AuthProvider>
       <TradeProvider>
-        <AppContent />
+        <Suspense fallback={
+          <div className="flex min-h-screen items-center justify-center bg-background">
+            <LoadingLogo />
+          </div>
+        }>
+          <AppContent />
+        </Suspense>
       </TradeProvider>
     </AuthProvider>
   )
