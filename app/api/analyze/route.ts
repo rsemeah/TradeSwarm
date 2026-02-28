@@ -99,8 +99,6 @@ Provide:
 
   return result.output
 }
-import { runTradeSwarm } from "@/lib/engine"
-
 export async function POST(req: Request) {
   const correlationId = crypto.randomUUID()
   const requestStartedAt = Date.now()
@@ -228,13 +226,6 @@ export async function POST(req: Request) {
         reasonCode: "ARBITRATION_SKIPPED",
       })
     }
-    const { proofBundle } = await runTradeSwarm({
-      mode: "analyze",
-      ticker,
-      theme,
-      marketContext,
-      useSwarm,
-    })
 
     const engineAnalysis = await runEngineAnalysis(ticker, 150, 10000, finalAnalysis.trustScore)
     const uniqueDecisions = new Set(successfulAnalyses.map((a) => a.analysis.status))
@@ -306,7 +297,6 @@ export async function POST(req: Request) {
         trustScore: r.analysis.trustScore,
         reasoning: r.analysis.reasoning,
       })),
-      // For receipt drawer AI breakdown
       aiConsensus: successfulAnalyses.length > 1 ? {
         groq: successfulAnalyses.find(a => a.model.includes("groq")) ? {
           decision: successfulAnalyses.find(a => a.model.includes("groq"))!.analysis.status,
@@ -321,28 +311,6 @@ export async function POST(req: Request) {
         finalVerdict: consensus?.finalDecision || finalAnalysis.status,
         consensusStrength: consensus?.confidenceScore || finalAnalysis.trustScore,
       } : undefined,
-      analysis: proofBundle.decision,
-      consensus: proofBundle.consensus,
-      modelResults: proofBundle.modelResults,
-      aiConsensus: {
-        groq: proofBundle.modelResults.find((m) => m.model.includes("groq"))
-          ? {
-              decision: proofBundle.modelResults.find((m) => m.model.includes("groq"))!.status,
-              confidence: proofBundle.modelResults.find((m) => m.model.includes("groq"))!.trustScore,
-              reasoning: proofBundle.modelResults.find((m) => m.model.includes("groq"))!.reasoning,
-            }
-          : undefined,
-        openai: proofBundle.modelResults.find((m) => m.model.includes("openai"))
-          ? {
-              decision: proofBundle.modelResults.find((m) => m.model.includes("openai"))!.status,
-              confidence: proofBundle.modelResults.find((m) => m.model.includes("openai"))!.trustScore,
-              reasoning: proofBundle.modelResults.find((m) => m.model.includes("openai"))!.reasoning,
-            }
-          : undefined,
-        finalVerdict: proofBundle.consensus?.finalDecision || proofBundle.decision.status,
-        consensusStrength: proofBundle.consensus?.confidenceScore || proofBundle.decision.trustScore,
-      },
-      proofBundle,
     })
   } catch (error) {
     console.error("Analysis error:", error)
