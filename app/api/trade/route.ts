@@ -1,89 +1,54 @@
 import { createClient } from "@/lib/supabase/server"
+import { runCanonicalTrade } from "@/lib/engine/runCanonicalTrade"
 
 export async function POST(req: Request) {
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 })
+      return Response.json({ error: "Unauthorized", reasonCode: "UNAUTHORIZED" }, { status: 401 })
     }
 
-    const { action, trade } = await req.json()
+    const payload = await req.json()
+    const action = payload.action as "preview" | "simulate" | "execute"
+    const trade = payload.trade as { ticker?: string; amountDollars?: number }
 
-    if (!action || !trade) {
-      return Response.json({ error: "Action and trade are required" }, { status: 400 })
+    if (!action || !trade?.ticker) {
+      return Response.json({ error: "Action and trade.ticker are required", reasonCode: "MISSING_ACTION_OR_TRADE" }, { status: 400 })
     }
 
-    // Get user's current portfolio/preferences
-    const { data: preferences } = await supabase
-      .from("user_preferences")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
+    const { data: preferences } = await supabase.from("user_preferences").select("safety_mode").eq("user_id", user.id).single()
+    const { data: portfolioStats } = await supabase.from("portfolio_stats").select("balance").eq("user_id", user.id).single()
 
-    const safetyMode = preferences?.safety_mode || "training_wheels"
-    const maxTradesPerDay = safetyMode === "training_wheels" ? 1 : safetyMode === "normal" ? 3 : 10
+    const balance = Number(portfolioStats?.balance ?? 10000)
+    const safetyMode = String(preferences?.safety_mode ?? "training_wheels")
+    const amount = Number(trade.amountDollars ?? Math.round(balance * 0.015 * 100) / 100)
 
-    // Check daily trade limit
-    const today = new Date().toISOString().split("T")[0]
-    const { count: tradesToday } = await supabase
-      .from("trades")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gte("created_at", `${today}T00:00:00`)
-
-    if ((tradesToday || 0) >= maxTradesPerDay && action === "execute") {
-      return Response.json(
-        { error: `Daily limit reached (${maxTradesPerDay} trades in ${safetyMode} mode)` },
-        { status: 400 }
-      )
-    }
-
-    // Record the trade
-    const tradeRecord = {
-      user_id: user.id,
+    const result = await runCanonicalTrade({
+      mode: action,
       ticker: trade.ticker,
-      strategy: trade.strategy,
-      action: action, // "execute" or "simulate"
-      amount: trade.amountDollars || 0,
-      trust_score: trade.trustScore,
-      status: trade.status,
-      is_paper: safetyMode === "training_wheels" || action === "simulate",
-      reasoning: trade.bullets?.why || "",
-    }
-
-    const { data: insertedTrade, error: insertError } = await supabase
-      .from("trades")
-      .insert(tradeRecord)
-      .select()
-      .single()
-
-    if (insertError) {
-      console.error("Trade insert error:", insertError)
-      return Response.json({ error: "Failed to record trade" }, { status: 500 })
-    }
-
-    // Update paper trades count if in training wheels
-    if (safetyMode === "training_wheels") {
-      await supabase
-        .from("portfolio_stats")
-        .upsert({
-          user_id: user.id,
-          paper_trades_completed: (preferences?.paper_trades_completed || 0) + 1,
-          updated_at: new Date().toISOString(),
-        })
-    }
+      userId: user.id,
+      amount,
+      balance,
+      safetyMode,
+      theme: payload.theme,
+      userContext: payload.marketContext,
+    })
 
     return Response.json({
-      success: true,
-      trade: insertedTrade,
-      message: action === "execute" 
-        ? `Trade executed: ${trade.ticker} for $${trade.amountDollars}` 
-        : `Simulation recorded: ${trade.ticker}`,
+      success: !result.blocked,
+      blocked: result.blocked,
+      tradeId: result.tradeId,
+      receiptId: result.receiptId,
+      proofBundle: result.proofBundle,
+      legacyProofBundle: result.legacyProofBundle,
+      reasonCode: result.proofBundle.safety_decision.reason_code,
     })
   } catch (error) {
     console.error("Trade error:", error)
-    return Response.json({ error: String(error) }, { status: 500 })
+    return Response.json({ error: String(error), reasonCode: "TRADE_ROUTE_FAILED" }, { status: 500 })
   }
 }

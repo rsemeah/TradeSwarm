@@ -66,6 +66,11 @@ export function TradesScreen({ aiCandidate }: TradesScreenProps) {
           <p className={`text-sm ${state.lastResult?.success ? "text-accent" : "text-danger"}`}>
             {notification}
           </p>
+          {state.lastResult?.reasonCode && (
+            <p className="mt-1 text-[11px] font-mono text-muted-foreground">
+              reasonCode: {state.lastResult.reasonCode}
+            </p>
+          )}
         </div>
       )}
 

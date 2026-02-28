@@ -1,0 +1,91 @@
+name: Self-Healing Guardian
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  stabilize:
+    if: github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
+
+      - name: Run Tests
+        run: pnpm test --if-present
+
+  auto-fix:
+    needs: stabilize
+    if: failure() && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run Codex Auto-Fix
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: |
+            The CI build failed.
+
+            Fix ONLY:
+            - Missing imports
+            - Type errors
+            - Failing lint rules
+            - Build-time errors
+            - Missing stubs for referenced modules
+            - Env validation errors
+
+            Do NOT:
+            - Change business logic
+            - Bypass safety or determinism checks
+            - Disable failing tests
+
+            Make minimal diffs.
+            Commit changes.
+            Push to this PR branch.
+
+  auto-merge:
+    needs: stabilize
+    if: success() && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Enable Auto Merge
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          merge-method: rebase
