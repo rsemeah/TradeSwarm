@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server"
 import { detectRegime, regimeToContext } from "./regime"
 import { simulateRisk, riskToContext } from "./risk"
 import { requireAnyRuntimeEnv } from "@/lib/env/server-runtime"
+import { deriveSeedFromString, simulateRisk, riskToContext } from "./risk"
 
 const DecisionSchema = z.object({
   ticker: z.string(),
@@ -221,12 +222,14 @@ export async function runTradeSwarm(params: RunTradeSwarmParams): Promise<{
   })
 
   const baseTrustScore = 50
+  const riskSeed = deriveSeedFromString(requestId)
   const risk = simulateRisk({
     ticker,
     amount: estimatedAmount,
     balance,
     trustScore: baseTrustScore,
     regime,
+    seed: riskSeed,
     strategy: normalizeStrategy(params.trade?.strategy),
   })
   stages.push({
