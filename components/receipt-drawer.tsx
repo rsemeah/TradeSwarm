@@ -117,11 +117,11 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
   return (
     <div className="fixed inset-0 z-50">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Drawer */}
       <div
-        className="absolute bottom-0 left-0 right-0 max-h-[90vh] overflow-hidden rounded-t-2xl bg-card"
+        className="absolute bottom-0 left-0 right-0 z-50 max-h-[90vh] overflow-hidden rounded-t-2xl bg-card"
         style={{ animation: "slideUp 0.3s ease-out" }}
       >
         {/* Handle */}
