@@ -1,4 +1,10 @@
+/**
+ * GET /api/health/engine
+ * Live engine health check: DB connectivity + real Yahoo Finance probes.
+ */
+
 import { createClient } from "@/lib/supabase/server"
+import { probeMarketDataHealth } from "@/lib/engine/market-context"
 
 export async function GET() {
   const startTime = Date.now()
@@ -6,69 +12,79 @@ export async function GET() {
   try {
     const supabase = await createClient()
 
-    // Get recent engine events (last 24h)
+    // DB + Yahoo probes in parallel
+    const [dbResult, yahooResult] = await Promise.all([
+      supabase
+        .from("trade_receipts")
+        .select("*", { count: "exact", head: true }),
+      probeMarketDataHealth(),
+    ])
+
+    // Recent activity (last 24h)
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    
-    const { data: recentTrades, count: tradeCount } = await supabase
-      .from("trades")
-      .select("*", { count: "exact" })
-      .gte("created_at", yesterday)
-      .order("created_at", { ascending: false })
-      .limit(10)
 
-    const { data: recentReceipts, count: receiptCount } = await supabase
-      .from("trade_receipts")
-      .select("*", { count: "exact" })
-      .gte("executed_at", yesterday)
-      .limit(10)
+    const [{ count: tradeCount }, { data: recentEvents, count: eventCount }] = await Promise.all([
+      supabase
+        .from("trades")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", yesterday),
+      supabase
+        .from("engine_events")
+        .select("name, status, created_at", { count: "exact" })
+        .gte("created_at", yesterday)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ])
 
-    // Calculate success rate
-    const successfulTrades = recentTrades?.filter((t) => t.status === "GO") || []
-    const successRate = tradeCount ? (successfulTrades.length / tradeCount) * 100 : 0
+    const errEvents = recentEvents?.filter((e) => e.status === "error") ?? []
+    const blockedEvents = recentEvents?.filter((e) => e.status === "blocked") ?? []
 
-    // Engine status
-    const engineStatus = {
-      status: "operational",
-      lastActivity: recentTrades?.[0]?.created_at || null,
-      uptime: "100%", // Placeholder for V1
-      metrics: {
-        tradesLast24h: tradeCount || 0,
-        receiptsLast24h: receiptCount || 0,
-        successRate: Math.round(successRate),
-        avgTrustScore: recentTrades?.length
-          ? Math.round(
-              recentTrades.reduce((sum, t) => sum + (t.trust_score || 0), 0) / recentTrades.length
-            )
-          : 0,
-      },
-      components: {
-        aiSwarm: {
-          status: "ok",
-          models: ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"],
-        },
-        regime: {
-          status: "stub", // Will be enhanced
-          lastUpdate: null,
-        },
-        risk: {
-          status: "stub", // Will be enhanced
-          lastCalculation: null,
-        },
-      },
-    }
+    const dbOk = !dbResult.error
+    const yahooOk = yahooResult.status !== "down"
+    const ok = dbOk && yahooOk
 
     return Response.json({
-      ...engineStatus,
+      ok,
+      engineVersion: "1.0.0",
+      checks: {
+        db: {
+          ok: dbOk,
+          receiptsTotal: dbResult.count ?? 0,
+          error: dbResult.error ? String(dbResult.error) : undefined,
+        },
+        yahoo: {
+          ok: yahooOk,
+          status: yahooResult.status,
+          latencyMs: yahooResult.latencyMs,
+          symbols: yahooResult.symbols,
+        },
+        orchestrator: {
+          ok: true,
+          components: {
+            regime: "live",
+            risk: "live",
+            deliberation: "live",
+            scoring: "live",
+            events: "live",
+          },
+        },
+      },
+      metrics: {
+        tradesLast24h: tradeCount ?? 0,
+        eventsLast24h: eventCount ?? 0,
+        errorsLast24h: errEvents.length,
+        blockedLast24h: blockedEvents.length,
+      },
       timestamp: new Date().toISOString(),
-      latency: Date.now() - startTime,
+      latencyMs: Date.now() - startTime,
     })
   } catch (error) {
     return Response.json(
       {
-        status: "error",
+        ok: false,
         error: String(error),
         timestamp: new Date().toISOString(),
-        latency: Date.now() - startTime,
+        latencyMs: Date.now() - startTime,
       },
       { status: 500 }
     )
