@@ -1,31 +1,35 @@
 import { createClient } from "@/lib/supabase/server"
+import { runCanonicalTrade } from "@/lib/engine/runCanonicalTrade"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { collectInstitutionalValidation, shouldFreezeExecution } from "@/lib/engine/institutionalValidation"
 
 export async function POST(req: Request) {
+  const correlationId = crypto.randomUUID()
+
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
     if (!user) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 })
+      return Response.json({ error: "Unauthorized", reasonCode: "UNAUTHORIZED", correlationId }, { status: 401 })
     }
 
-    const { trade, aiConsensus, regime, risk } = await req.json()
-
-    if (!trade) {
-      return Response.json({ error: "Trade data is required" }, { status: 400 })
+    const { ticker, theme, amount: requestedAmount, marketContext } = await req.json()
+    if (!ticker) {
+      return Response.json({ error: "ticker is required", reasonCode: "MISSING_TICKER", correlationId }, { status: 400 })
     }
 
-    // Get user preferences
-    const { data: preferences } = await supabase
-      .from("user_preferences")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
+    const [{ data: preferences }, { data: portfolioStats }] = await Promise.all([
+      supabase.from("user_preferences").select("safety_mode").eq("user_id", user.id).single(),
+      supabase.from("portfolio_stats").select("balance").eq("user_id", user.id).single(),
+    ])
 
-    const safetyMode = preferences?.safety_mode || "training_wheels"
+    const safetyMode = String(preferences?.safety_mode ?? "training_wheels")
+    const balance = Number(portfolioStats?.balance ?? 10000)
+
     const maxTradesPerDay = safetyMode === "training_wheels" ? 1 : safetyMode === "normal" ? 3 : 10
-
-    // Check daily limit
     const today = new Date().toISOString().split("T")[0]
     const { count: tradesToday } = await supabase
       .from("trades")
@@ -33,79 +37,56 @@ export async function POST(req: Request) {
       .eq("user_id", user.id)
       .gte("created_at", `${today}T00:00:00`)
 
-    if ((tradesToday || 0) >= maxTradesPerDay) {
+    if ((tradesToday ?? 0) >= maxTradesPerDay) {
       return Response.json(
-        { error: `Daily limit reached (${maxTradesPerDay} trades in ${safetyMode} mode)` },
+        {
+          error: `Daily limit reached (${maxTradesPerDay} trades in ${safetyMode} mode)`,
+          reasonCode: "DAILY_LIMIT_REACHED",
+          correlationId,
+        },
         { status: 400 }
       )
     }
 
-    // Record the executed trade
-    const tradeRecord = {
-      user_id: user.id,
-      ticker: trade.ticker,
-      strategy: trade.strategy || "options_spread",
-      action: "execute",
-      amount: trade.amountDollars || 0,
-      trust_score: trade.trustScore,
-      status: trade.status,
-      is_paper: safetyMode === "training_wheels",
-      reasoning: trade.bullets?.why || "",
-      // JSONB columns for V1
-      ai_consensus: aiConsensus || null,
-      regime_data: regime || null,
-      risk_data: risk || null,
+    const amount = Number(requestedAmount ?? Math.round(balance * 0.015 * 100) / 100)
+
+    const admin = createAdminClient()
+    const validation = await collectInstitutionalValidation(admin)
+    if (shouldFreezeExecution(validation)) {
+      return Response.json(
+        {
+          error: "Execution is frozen by institutional validation gates",
+          reasonCode: "INSTITUTIONAL_FREEZE_ACTIVE",
+          correlationId,
+          validation,
+        },
+        { status: 423 }
+      )
     }
 
-    const { data: insertedTrade, error: insertError } = await supabase
-      .from("trades")
-      .insert(tradeRecord)
-      .select()
-      .single()
-
-    if (insertError) {
-      console.error("Trade execute error:", insertError)
-      return Response.json({ error: "Failed to execute trade" }, { status: 500 })
-    }
-
-    // Create receipt
-    const receiptRecord = {
-      trade_id: insertedTrade.id,
-      user_id: user.id,
-      ticker: trade.ticker,
-      action: "execute",
-      amount: trade.amountDollars,
-      trust_score: trade.trustScore,
-      ai_consensus: aiConsensus,
-      regime_snapshot: regime,
-      risk_snapshot: risk,
-      executed_at: new Date().toISOString(),
-    }
-
-    await supabase.from("trade_receipts").insert(receiptRecord)
-
-    // Update stats
-    const { data: stats } = await supabase
-      .from("portfolio_stats")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
-
-    await supabase.from("portfolio_stats").upsert({
-      user_id: user.id,
-      paper_trades_completed: (stats?.paper_trades_completed || 0) + 1,
-      total_trades: (stats?.total_trades || 0) + 1,
-      updated_at: new Date().toISOString(),
+    const result = await runCanonicalTrade({
+      mode: "execute",
+      ticker,
+      userId: user.id,
+      amount,
+      balance,
+      safetyMode,
+      theme,
+      userContext: marketContext,
     })
 
     return Response.json({
-      success: true,
-      trade: insertedTrade,
-      receipt: receiptRecord,
-      message: `Executed: ${trade.ticker} for $${trade.amountDollars}`,
+      success: !result.blocked,
+      blocked: result.blocked,
+      reasonCode: result.proofBundle.safety_decision.reason_code,
+      correlationId,
+      tradeId: result.tradeId,
+      receiptId: result.receiptId,
+      proofBundle: result.proofBundle,
+      legacyProofBundle: result.legacyProofBundle,
     })
   } catch (error) {
     console.error("Execute error:", error)
-    return Response.json({ error: String(error) }, { status: 500 })
+    return Response.json({ error: String(error), reasonCode: "EXECUTE_FAILED", correlationId }, { status: 500 })
   }
 }
