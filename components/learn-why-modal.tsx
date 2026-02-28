@@ -76,12 +76,12 @@ export function LearnWhyModal({ isOpen, onClose, candidate }: LearnWhyModalProps
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 z-40 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
       />
       
       {/* Modal */}
-      <div className="relative max-h-[85vh] w-full max-w-lg overflow-hidden rounded-xl bg-card border border-border">
+      <div className="relative z-50 max-h-[85vh] w-full max-w-lg overflow-hidden rounded-xl border border-border bg-card">
         {/* Header */}
         <div className="border-b border-border p-4">
           <div className="flex items-center justify-between">
