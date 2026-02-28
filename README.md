@@ -133,8 +133,11 @@ pnpm build
 
 ## CI/CD
 
-- `.github/workflows/ci.yml` - Lint, typecheck, build on push/PR
-- `.github/dependabot.yml` - Weekly dependency updates
+- `.github/workflows/ci.yml` - Deterministic CI gate (lint, typecheck, build)
+- `.github/workflows/codex-policy.yml` - Codex PR policy review via `openai/codex-action@v1`
+- `.github/workflows/dependabot-auto-merge.yml` - Enables auto-merge for labeled Dependabot PRs
+- `.github/dependabot.yml` - Weekly dependency updates with grouped patch/minor bumps
+- `AGENTS.md` - Repository policy contract used by Codex and maintainers
 
 ## License
 
