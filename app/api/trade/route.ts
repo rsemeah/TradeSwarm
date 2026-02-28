@@ -6,13 +6,13 @@ export async function POST(req: Request) {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 })
+      return Response.json({ error: "Unauthorized", reasonCode: "UNAUTHORIZED" }, { status: 401 })
     }
 
     const { action, trade } = await req.json()
 
     if (!action || !trade) {
-      return Response.json({ error: "Action and trade are required" }, { status: 400 })
+      return Response.json({ error: "Action and trade are required", reasonCode: "MISSING_ACTION_OR_TRADE" }, { status: 400 })
     }
 
     // Get user's current portfolio/preferences
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
     if ((tradesToday || 0) >= maxTradesPerDay && action === "execute") {
       return Response.json(
-        { error: `Daily limit reached (${maxTradesPerDay} trades in ${safetyMode} mode)` },
+        { error: `Daily limit reached (${maxTradesPerDay} trades in ${safetyMode} mode)`, reasonCode: "DAILY_LIMIT_REACHED" },
         { status: 400 }
       )
     }
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
 
     if (insertError) {
       console.error("Trade insert error:", insertError)
-      return Response.json({ error: "Failed to record trade" }, { status: 500 })
+      return Response.json({ error: "Failed to record trade", reasonCode: "TRADE_INSERT_FAILED" }, { status: 500 })
     }
 
 
@@ -91,6 +91,7 @@ export async function POST(req: Request) {
 
     return Response.json({
       success: true,
+      reasonCode: null,
       trade: insertedTrade,
       receipt: receiptRecord,
       message: action === "execute" 
@@ -99,6 +100,6 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error("Trade error:", error)
-    return Response.json({ error: String(error) }, { status: 500 })
+    return Response.json({ error: String(error), reasonCode: "TRADE_ROUTE_FAILED" }, { status: 500 })
   }
 }

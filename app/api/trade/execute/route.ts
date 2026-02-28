@@ -1,7 +1,10 @@
 import { createClient } from "@/lib/supabase/server"
+import { evaluateDegradedMode, recordStageEvent } from "@/lib/engine/events"
 import { runTradeSwarm } from "@/lib/engine"
 
 export async function POST(req: Request) {
+  const correlationId = crypto.randomUUID()
+
   try {
     const supabase = await createClient()
     const {
@@ -9,9 +12,37 @@ export async function POST(req: Request) {
     } = await supabase.auth.getUser()
 
     if (!user) {
-      return Response.json({ error: "Unauthorized" }, { status: 401 })
+      return Response.json({ error: "Unauthorized", reasonCode: "UNAUTHORIZED", correlationId }, { status: 401 })
     }
 
+    const { trade, aiConsensus, regime, risk, degradedMode } = await req.json()
+
+    if (!trade) {
+      return Response.json({ error: "Trade data is required", reasonCode: "MISSING_TRADE", correlationId }, { status: 400 })
+    }
+
+    const degradedDecision = evaluateDegradedMode(
+      degradedMode?.warnings?.map((warning: string) => warning.replace("Engine degraded: ", "")) ||
+        (degradedMode?.reasonCode ? [degradedMode.reasonCode] : [])
+    )
+
+    if (degradedDecision.executeBlocked || degradedMode?.executeBlocked) {
+      return Response.json(
+        {
+          success: false,
+          error: "Execution blocked due to critical engine stage failure",
+          reasonCode: "EXECUTE_BLOCKED_CRITICAL_STAGE",
+          correlationId,
+          degradedMode: {
+            ...degradedDecision,
+            policy: { preview: "allowed_with_warnings", execute: "fail_closed" },
+          },
+        },
+        { status: 409 }
+      )
+    }
+
+    const { data: preferences } = await supabase.from("user_preferences").select("*").eq("user_id", user.id).single()
     const {
       trade,
       aiConsensus,
@@ -50,12 +81,15 @@ export async function POST(req: Request) {
 
     if ((tradesToday || 0) >= maxTradesPerDay) {
       return Response.json(
-        { error: `Daily limit reached (${maxTradesPerDay} trades in ${safetyMode} mode)` },
+        {
+          error: `Daily limit reached (${maxTradesPerDay} trades in ${safetyMode} mode)`,
+          reasonCode: "DAILY_LIMIT_REACHED",
+          correlationId,
+        },
         { status: 400 }
       )
     }
 
-    // Record the executed trade
     const tradeRecord = {
       user_id: user.id,
       ticker: trade.ticker,
@@ -66,23 +100,19 @@ export async function POST(req: Request) {
       status: trade.status,
       is_paper: safetyMode === "training_wheels",
       reasoning: trade.bullets?.why || "",
-      // JSONB columns for V1
       ai_consensus: aiConsensus || null,
       regime_data: regime || null,
       risk_data: risk || null,
     }
 
-    const { data: insertedTrade, error: insertError } = await supabase
-      .from("trades")
-      .insert(tradeRecord)
-      .select()
-      .single()
+    const { data: insertedTrade, error: insertError } = await supabase.from("trades").insert(tradeRecord).select().single()
 
     if (insertError) {
       console.error("Trade execute error:", insertError)
-      return Response.json({ error: "Failed to execute trade" }, { status: 500 })
+      return Response.json({ error: "Failed to execute trade", reasonCode: "TRADE_INSERT_FAILED", correlationId }, { status: 500 })
     }
 
+    const receiptWriteStart = Date.now()
     // Create receipt
     const executedAt = new Date().toISOString()
     const receiptRecord = {
@@ -128,14 +158,19 @@ export async function POST(req: Request) {
       executed_at: new Date().toISOString(),
     }
 
-    await supabase.from("trade_receipts").insert(receiptRecord)
+    const { error: receiptError } = await supabase.from("trade_receipts").insert(receiptRecord)
 
-    // Update stats
-    const { data: stats } = await supabase
-      .from("portfolio_stats")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
+    await recordStageEvent(supabase, {
+      stage: "RECEIPT_WRITTEN",
+      status: receiptError ? "failed" : "success",
+      correlationId,
+      userId: user.id,
+      ticker: trade.ticker,
+      durationMs: Date.now() - receiptWriteStart,
+      reasonCode: receiptError ? "RECEIPT_WRITE_FAILED" : undefined,
+    })
+
+    const { data: stats } = await supabase.from("portfolio_stats").select("*").eq("user_id", user.id).single()
 
     await supabase.from("portfolio_stats").upsert({
       user_id: user.id,
@@ -154,6 +189,15 @@ export async function POST(req: Request) {
 
     return Response.json({
       success: true,
+      reasonCode: receiptError ? "RECEIPT_WRITE_FAILED" : null,
+      correlationId,
+      trade: insertedTrade,
+      receipt: receiptRecord,
+      degradedMode: {
+        ...degradedDecision,
+        policy: { preview: "allowed_with_warnings", execute: "allowed" },
+      },
+      message: `Executed: ${trade.ticker} for $${trade.amountDollars}`,
       trade: persisted?.trade,
       receipt: persisted?.receipt,
       message: `Executed: ${canonicalProofBundle.decision.ticker} for $${canonicalProofBundle.decision.recommendedAmount ?? 0}`,
@@ -161,6 +205,6 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error("Execute error:", error)
-    return Response.json({ error: String(error) }, { status: 500 })
+    return Response.json({ error: String(error), reasonCode: "EXECUTE_FAILED", correlationId }, { status: 500 })
   }
 }

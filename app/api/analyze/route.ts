@@ -1,5 +1,7 @@
 import { generateText, Output } from "ai"
 import { z } from "zod"
+import { createClient } from "@/lib/supabase/server"
+import { recordStageEvent } from "@/lib/engine/events"
 import { runEngineAnalysis } from "@/lib/engine"
 import { calculateCredibilityScore } from "@/lib/scoring/credibility"
 
@@ -100,7 +102,11 @@ Provide:
 import { runTradeSwarm } from "@/lib/engine"
 
 export async function POST(req: Request) {
+  const correlationId = crypto.randomUUID()
+  const requestStartedAt = Date.now()
+
   try {
+    const supabase = await createClient()
     const startedAt = Date.now()
     const { ticker, theme, marketContext, useSwarm = true } = await req.json()
 
@@ -108,6 +114,120 @@ export async function POST(req: Request) {
       return Response.json({ error: "Ticker is required" }, { status: 400 })
     }
 
+    await recordStageEvent(supabase, {
+      stage: "CONTEXT_DONE",
+      status: "success",
+      correlationId,
+      ticker,
+      durationMs: Date.now() - requestStartedAt,
+      details: { theme: theme || "General" },
+    })
+
+    // Models to use - Groq is free and primary, OpenAI as second opinion
+    // Check which API keys are available
+    const hasOpenAI = !!process.env.AI_GATEWAY_API_KEY || !!process.env.OPENAI_API_KEY
+    
+    // Use Groq + OpenAI for dual-model consensus (both fast and accurate)
+    const models = useSwarm && hasOpenAI
+      ? ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"]
+      : ["groq/llama-3.3-70b-versatile"] // Groq-only mode (free tier)
+
+    // Run analyses in parallel
+    const round1Start = Date.now()
+    const results = await Promise.all(
+      models.map((model) =>
+        analyzeWithModel(model, ticker, theme || "General", marketContext || "Normal market conditions")
+      )
+    )
+
+    // Filter successful analyses
+    const successfulAnalyses = results.filter((r) => r.analysis !== null) as {
+      model: string
+      analysis: z.infer<typeof TradeAnalysisSchema>
+    }[]
+
+    if (successfulAnalyses.length === 0) {
+      await recordStageEvent(supabase, {
+        stage: "ROUND1_DONE",
+        status: "failed",
+        correlationId,
+        ticker,
+        durationMs: Date.now() - round1Start,
+        reasonCode: "ROUND1_FAILED",
+      })
+      return Response.json(
+        {
+          error: "All models failed to analyze",
+          reasonCode: "ROUND1_FAILED",
+          details: results.map((r) => r.error),
+          correlationId,
+        },
+        { status: 500 }
+      )
+    }
+
+    await recordStageEvent(supabase, {
+      stage: "ROUND1_DONE",
+      status: "success",
+      correlationId,
+      ticker,
+      durationMs: Date.now() - round1Start,
+      details: {
+        successfulModels: successfulAnalyses.map((analysis) => analysis.model),
+      },
+    })
+
+    // Get consensus if multiple models succeeded
+    let finalAnalysis: z.infer<typeof TradeAnalysisSchema>
+    let consensus: z.infer<typeof SwarmConsensusSchema> | null = null
+
+    if (successfulAnalyses.length > 1 && useSwarm) {
+      const round2Start = Date.now()
+      consensus = await getSwarmConsensus(successfulAnalyses)
+      await recordStageEvent(supabase, {
+        stage: "ROUND2_DONE",
+        status: "success",
+        correlationId,
+        ticker,
+        durationMs: Date.now() - round2Start,
+      })
+
+      // Use the analysis from the model that matches consensus, or the highest trust score
+      const arbitrationStart = Date.now()
+      const matchingAnalysis = successfulAnalyses.find(
+        (a) => a.analysis.status === consensus!.finalDecision
+      )
+      finalAnalysis = matchingAnalysis?.analysis || successfulAnalyses[0].analysis
+      finalAnalysis.trustScore = consensus.confidenceScore
+
+      await recordStageEvent(supabase, {
+        stage: "ARBITRATION_DONE",
+        status: "success",
+        correlationId,
+        ticker,
+        durationMs: Date.now() - arbitrationStart,
+        details: { finalDecision: consensus.finalDecision },
+      })
+    } else {
+      finalAnalysis = successfulAnalyses[0].analysis
+
+      await recordStageEvent(supabase, {
+        stage: "ROUND2_DONE",
+        status: "degraded",
+        correlationId,
+        ticker,
+        durationMs: 0,
+        reasonCode: "ROUND2_SKIPPED",
+      })
+      await recordStageEvent(supabase, {
+        stage: "ARBITRATION_DONE",
+        status: "degraded",
+        correlationId,
+        ticker,
+        durationMs: 0,
+        reasonCode: "ARBITRATION_SKIPPED",
+      })
+    }
     const { proofBundle } = await runTradeSwarm({
       mode: "analyze",
       ticker,
@@ -161,8 +281,18 @@ export async function POST(req: Request) {
 
     finalAnalysis.trustScore = credibility.trustScore
 
+    await recordStageEvent(supabase, {
+      stage: "SCORING_DONE",
+      status: "success",
+      correlationId,
+      ticker,
+      durationMs: Date.now() - requestStartedAt,
+      details: { trustScore: finalAnalysis.trustScore, status: finalAnalysis.status },
+    })
+
     return Response.json({
       success: true,
+      correlationId,
       analysis: finalAnalysis,
       consensus,
       credibility,
@@ -216,6 +346,6 @@ export async function POST(req: Request) {
     })
   } catch (error) {
     console.error("Analysis error:", error)
-    return Response.json({ error: String(error) }, { status: 500 })
+    return Response.json({ error: String(error), reasonCode: "ANALYSIS_FAILED", correlationId }, { status: 500 })
   }
 }
