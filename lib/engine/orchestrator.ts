@@ -15,7 +15,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { buildMarketContext } from "./market-context"
 import { detectRegime } from "./regime"
-import { simulateRisk } from "./risk"
+import { deriveSeedFromString, simulateRisk } from "./risk"
 import { runDeliberation } from "./deliberation"
 import { computeTrustScore } from "./scoring"
 import { emitEngineEvent } from "./events"
@@ -231,7 +231,8 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
 
   // ── Stage 2: Risk simulation ──────────────────────────────────────────────
   const riskStart = Date.now()
-  const riskRaw = simulateRisk({ ticker, amount, balance, trustScore: 50, regime: regimeRaw })
+  const riskSeed = deriveSeedFromString(requestId)
+  const riskRaw = simulateRisk({ ticker, amount, balance, trustScore: 50, regime: regimeRaw, seed: riskSeed })
 
   const risk: ProofRiskSnapshot = {
     simCount: 1000,
