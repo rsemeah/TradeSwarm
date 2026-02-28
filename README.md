@@ -1,113 +1,124 @@
 # TradeSwarm
 
-A regime-aware AI trading assistant that evaluates options trade setups using multi-model consensus, market regime detection, and risk simulation before recommending position sizing.
+A regime-aware AI trading assistant that evaluates options trade setups using multi-model consensus, deterministic receipts, and safety gates before recommending position sizing.
 
 ## Build Status
 
 | Component | Status |
 |-----------|--------|
-| Core Engine | Implemented |
-| AI Consensus (Groq) | Implemented |
-| AI Consensus (OpenAI) | Optional (requires API key) |
+| Canonical Trade Orchestrator | Implemented |
+| Determinism (SHA-256 hashing) | Implemented |
+| Market Snapshot Persistence | Implemented |
+| Safety Evaluator | Implemented |
+| Scanner (src/lib/scanner) | Implemented |
 | Regime Detection | Implemented |
-| Risk Simulation | Implemented |
-| Safety Gates | Implemented |
+| Calibration Analytics | Implemented |
+| Outcome Tracking | Implemented |
 | Paper Trading | Implemented |
-| Live Trading | Not Started |
+| Live Broker Integration | Not Started |
 
 ## Architecture
 
 ```
-app/
-├── api/
-│   ├── analyze/            # AI swarm consensus analysis
-│   ├── trade/
-│   │   ├── preview/        # Quick preview with regime context
-│   │   ├── execute/        # Execute trade (paper mode)
-│   │   └── simulate/       # Monte Carlo simulation
-│   ├── health/             # System + engine health
-│   ├── learn-why/          # AI explainer for blocked trades
-│   └── watchlist/          # Watchlist management
-├── auth/                   # Login/signup pages
-└── page.tsx                # Main app entry
-
-components/
-├── app.tsx                 # Main app shell with 3-pane workspace
-├── screens/                # Radar, Trades, Money screens
-├── trade-card.tsx          # GO/WAIT/NO trade cards
-├── receipt-drawer.tsx      # Trade receipt with AI breakdown
-├── sniper-overlay.tsx      # Execute confirmation overlay
-└── learn-why-modal.tsx     # AI explanation modal
+app/api/
+├── analyze/                    # AI swarm consensus
+├── scan/                       # Scanner endpoint with caching
+├── trade/
+│   ├── preview/                # Preview with safety check
+│   ├── execute/                # Execute (paper mode)
+│   └── simulate/               # Monte Carlo simulation
+├── internal/
+│   ├── ops/calibration-metrics # Calibration dashboard
+│   └── ops/replay/[id]         # Deterministic replay
+├── health/                     # System + engine health
+└── learn-why/                  # AI explainer
 
 lib/
 ├── engine/
-│   ├── index.ts            # Engine orchestrator (runTradeSwarm)
-│   ├── regime.ts           # Market regime detection
-│   └── risk.ts             # Monte Carlo risk simulation
-├── adapters/
-│   └── http.ts             # Circuit breaker + timeout utilities
-├── supabase/               # Supabase client + middleware
-└── types.ts                # TypeScript definitions
+│   ├── runCanonicalTrade.ts    # Main orchestrator
+│   ├── orchestrator.ts         # runTradeSwarm base
+│   ├── safety.ts               # Safety evaluator
+│   ├── determinism.ts          # SHA-256 hashing
+│   ├── regime.ts               # Regime detection
+│   └── risk.ts                 # Risk simulation
+├── calibration/                # Analytics + threshold updates
+├── scanner/                    # Scanner (lib version)
+├── types/
+│   └── proof-bundle.ts         # Canonical proof bundle v2
+└── adapters/
+    └── http.ts                 # Circuit breaker
 
-scripts/                    # SQL migrations (001-002)
-docs/                       # Architecture decisions
+src/lib/
+├── scanner/                    # Full scanner implementation
+├── news/                       # News + calendar modules
+├── adapters/                   # Options chain, safety adapters
+├── indicators/                 # RV20 indicator
+└── receipts/                   # Receipt writer
+
+scripts/                        # SQL migrations (001-003)
 ```
 
-## Features
+## Key Features
 
-### AI Consensus Engine
-- Primary model: Groq (Llama 3.3 70B, free tier)
-- Optional secondary: OpenAI (via AI Gateway)
-- Consensus rules: Both agree for GO, any NO = final NO, disagreement = WAIT
+### Canonical Trade Flow
+All trade routes call `runCanonicalTrade()` which:
+1. Runs `runTradeSwarm()` for AI analysis
+2. Builds canonical proof bundle with determinism context
+3. Evaluates safety gates (spread, volume, OI, slippage)
+4. Persists market snapshot with content hash
+5. Enforces replay policy before execution
+6. Writes immutable receipt with `determinism_hash`
 
-### Market Regime Detection
-- Yahoo Finance data with circuit breaker protection
-- Trend analysis (bullish/bearish/neutral)
-- Volatility classification (low/medium/high/extreme)
-- Momentum detection
+### Deterministic Replay
+Every receipt includes:
+- `market_snapshot_ref` - UUID reference to stored snapshot
+- `market_snapshot_hash` - SHA-256 of snapshot content
+- `determinism_hash` - Hash of normalized inputs + snapshot + config
+- `engine_version` - For version-aware replay
 
-### Risk Simulation
-- Monte Carlo lite (configurable iterations)
-- Max loss estimation at 95th percentile
-- Position sizing recommendations
-
-### Safety Systems
-- **Training Wheels**: Max 1 trade/day, 1.5% position cap
-- **Circuit Breaker**: Auto-degrades after 3 consecutive failures
-- **Preflight Checks**: Gates before execution
+### Safety Evaluator
+Hard blocks for:
+- Spread > threshold
+- Volume < minimum
+- Open interest < minimum
+- Slippage > threshold
+- Earnings blackout
+- TruthSerum unavailable (fail-closed)
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/health` | GET | System health check |
-| `/api/health/engine` | GET | Engine status + circuit breakers |
-| `/api/analyze` | POST | Full AI swarm analysis |
-| `/api/trade/preview` | POST | Quick preview with regime |
-| `/api/trade/execute` | POST | Execute trade (paper) |
-| `/api/trade/simulate` | POST | Run Monte Carlo simulation |
-| `/api/learn-why` | POST | Get AI explanation |
-| `/api/watchlist` | POST | Add to watchlist |
+| `/api/scan` | POST | Run scanner, returns ranked candidates |
+| `/api/trade/preview` | POST | Preview with safety decision |
+| `/api/trade/execute` | POST | Execute (paper mode) |
+| `/api/trade/simulate` | POST | Monte Carlo simulation |
+| `/api/internal/ops/replay/[id]` | POST | Replay a receipt |
+| `/api/internal/ops/calibration-metrics` | GET | Calibration dashboard |
+| `/api/internal/jobs/outcome-tracker` | POST | Track trade outcomes |
 
-## Database
+## Database Schema
 
-Supabase (PostgreSQL) with migrations in `scripts/`:
+Migrations in `scripts/`:
 
-- `001_base_schema.sql` - Profiles, preferences, portfolio, trades, watchlist
-- `002_engine_tables.sql` - Receipts, engine events, learn-why cache
+```
+001_base_schema.sql      - profiles, user_preferences, portfolio_stats, watchlist
+002_trades_and_receipts.sql - trades, market_snapshots, trade_receipts, replay_reports
+003_engine_events.sql    - engine_events, scan_results, learn_why_cache, calibration_metrics
+```
 
 ## Environment Variables
 
 ```env
-# Supabase (Required)
+# Required
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-
-# AI (Required)
 GROQ_API_KEY=
 
-# AI (Optional - enables multi-model consensus)
-AI_GATEWAY_API_KEY=
+# Optional
+AI_GATEWAY_API_KEY=           # Enables OpenAI/Anthropic
+REPLAY_COVERAGE_THRESHOLD=0   # Block execute if coverage < threshold
+REPLAY_MISMATCH_THRESHOLD=1   # Block execute if mismatch rate > threshold
 ```
 
 ## Development
@@ -115,112 +126,16 @@ AI_GATEWAY_API_KEY=
 ```bash
 pnpm install
 pnpm dev
+pnpm lint
+pnpm typecheck
+pnpm build
 ```
 
 ## CI/CD
 
-- `.github/workflows/ci.yml` - Lint, typecheck, build on PR
+- `.github/workflows/ci.yml` - Lint, typecheck, build on push/PR
 - `.github/dependabot.yml` - Weekly dependency updates
 
-## Tech Stack
-
-- **Framework**: Next.js 15 (App Router)
-- **Database**: Supabase (PostgreSQL + Auth)
-- **AI**: Vercel AI SDK 6, Groq
-- **Styling**: Tailwind CSS + shadcn/ui
-
 ## License
 
-Source-available with all rights reserved. See [LICENSE](./LICENSE).
-TradeSwarm is a Next.js + Supabase trading decision platform. It evaluates trade candidates, runs safety checks, and records receipts that include model context and deterministic replay metadata.
-
-## Build Status (truthful)
-
-Current codebase status:
-
-- ✅ API routes exist for analysis, trade (`preview`/`simulate`/`execute`), scan, health, and watchlist under `app/api/*`.
-- ✅ Scanner foundation exists in `src/lib/scanner/*` and is exposed at `POST /api/scan`.
-- ✅ Canonical proof-bundle typings exist in `lib/types/proof-bundle.ts`.
-- ✅ Deterministic replay SQL scaffolding exists in `scripts/014_deterministic_replay.sql`.
-- ✅ CI and Dependabot configs exist in `.github/workflows/ci.yml` and `.github/dependabot.yml`.
-- ⚠️ The repository currently mixes `lib/*` and `src/lib/*` module locations; some flows are still in transition.
-
-## Current State
-
-- Core trade orchestration entrypoint: `lib/engine/runCanonicalTrade.ts`.
-- Safety evaluator: `lib/engine/safety.ts`.
-- Scan route and scan cache behavior: `app/api/scan/route.ts`.
-- Enterprise integration notes: `docs/enterprise-integration-decisions.md`.
-- SQL migrations live in `scripts/*.sql`.
-
-## Architecture Map
-
-```text
-app/
-  api/
-    analyze/
-    health/
-    learn-why/
-    scan/
-    trade/
-    watchlist/
-lib/
-  engine/
-  market-data/
-  scanner/
-  types/
-src/lib/
-  scanner/
-  news/
-  adapters/
-  receipts/
-scripts/
-  *.sql
-.github/
-  workflows/
-  dependabot.yml
-```
-
-## Running Locally
-
-1. Install dependencies:
-
-   ```bash
-   pnpm install
-   ```
-
-2. Configure environment variables in `.env.local` (Supabase and model provider keys).
-
-3. Run development server:
-
-   ```bash
-   pnpm dev
-   ```
-
-4. Quality checks:
-
-   ```bash
-   pnpm lint
-   pnpm typecheck
-   pnpm build
-   ```
-
-## Safety + Paper Mode
-
-TradeSwarm includes a safety evaluator (`lib/engine/safety.ts`) and route-level preview/simulate flows. Keep execution in paper/simulated mode until your deployment-level controls, broker integration, and governance checks are fully validated.
-
-## Migration Notes
-
-- SQL migrations are versioned in `scripts/`.
-- Existing environments should apply new files in numerical order used by your migration tooling.
-- `scripts/014_deterministic_replay.sql` adds replay-oriented snapshot/report tables.
-
-## Roadmap (non-committal)
-
-- **Near term:** unify `lib` vs `src/lib` ownership, complete deterministic receipt writes on all paths.
-- **Mid term:** expand scanner persistence and richer regime/news signals.
-- **Long term:** production hardening for audit/reporting, reliability, and operator tooling.
-
-## License
-
-All rights reserved. See `LICENSE`.
+All rights reserved. See [LICENSE](./LICENSE).
