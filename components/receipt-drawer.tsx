@@ -1,19 +1,13 @@
 "use client"
 
-import { useState } from "react"
-import type { TradeCandidate } from "@/lib/types"
+import type { ProofBundle } from "@/lib/types/proof"
+import type { TradeScoringDetail } from "@/lib/types"
 
-interface ReceiptData {
-  trade: TradeCandidate
+export interface ReceiptData {
+  proofBundle: ProofBundle
   executedAt: Date
   isSimulation: boolean
-  aiConsensus?: {
-    groq?: { decision: string; confidence: number; reasoning: string }
-    openai?: { decision: string; confidence: number; reasoning: string }
-    anthropic?: { decision: string; confidence: number; reasoning: string }
-    finalVerdict: string
-    consensusStrength: number
-  }
+  scoring?: TradeScoringDetail
   gates?: {
     name: string
     passed: boolean
@@ -28,242 +22,209 @@ interface ReceiptDrawerProps {
   receipt: ReceiptData | null
 }
 
-export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) {
-  const [activeTab, setActiveTab] = useState<"summary" | "ai" | "gates">("summary")
+function verdictColor(v: string) {
+  if (v === "GO") return "text-emerald-400"
+  if (v === "WAIT") return "text-amber-300"
+  return "text-rose-400"
+}
 
+export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) {
   if (!isOpen || !receipt) return null
 
-  const { trade, executedAt, isSimulation, aiConsensus, gates } = receipt
+  const { proofBundle, executedAt } = receipt
+  const finalDecision = proofBundle.finalDecision
 
   return (
     <div className="fixed inset-0 z-50">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* Drawer */}
-      <div 
-        className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-hidden rounded-t-2xl bg-card"
-        style={{ animation: "slideUp 0.3s ease-out" }}
-      >
-        {/* Handle */}
-        <div className="flex justify-center py-3">
-          <div className="h-1 w-10 rounded-full bg-border" />
-        </div>
-        
-        {/* Header */}
-        <div className="border-b border-border px-4 pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                  isSimulation 
-                    ? "bg-warning/20 text-warning" 
-                    : "bg-accent/20 text-accent"
-                }`}>
-                  {isSimulation ? "Simulated" : "Executed"}
-                </span>
-                <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-                  trade.status === "GO" ? "bg-accent/20 text-accent" :
-                  trade.status === "WAIT" ? "bg-warning/20 text-warning" :
-                  "bg-danger/20 text-danger"
-                }`}>
-                  {trade.status}
-                </span>
-              </div>
-              <h2 className="mt-2 font-mono text-2xl font-bold text-foreground">{trade.ticker}</h2>
-              <p className="text-xs text-muted-foreground">{trade.strategy}</p>
-            </div>
-            <div className="text-right">
-              <p className="font-mono text-xl font-bold text-accent">${trade.amountDollars}</p>
-              <p className="text-[10px] text-muted-foreground">
-                {executedAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} ET
-              </p>
-            </div>
+      <button aria-label="Close receipt drawer" className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-slate-950 p-4 text-slate-100">
+        <div className="mb-4 flex items-start justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-slate-400">Trade Receipt</p>
+            <h2 className="text-2xl font-semibold">{proofBundle.ticker}</h2>
+            <p className="text-xs text-slate-400">
+              {proofBundle.action} · {executedAt.toISOString()} · v{proofBundle.engineVersion}
+            </p>
           </div>
-        </div>
-        
-        {/* Tabs */}
-        <div className="flex border-b border-border">
-          {(["summary", "ai", "gates"] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-3 text-xs font-medium uppercase tracking-wider transition-colors ${
-                activeTab === tab
-                  ? "border-b-2 border-accent text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab === "ai" ? "AI Consensus" : tab}
-            </button>
-          ))}
-        </div>
-        
-        {/* Content */}
-        <div className="max-h-[50vh] overflow-y-auto p-4">
-          {activeTab === "summary" && (
-            <div className="space-y-4">
-              {/* Trust Score */}
-              <div className="rounded-lg border border-border bg-background p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Trust Score</span>
-                  <span className="font-mono text-lg font-bold text-foreground">{trade.trustScore}/100</span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
-                  <div 
-                    className="h-full rounded-full bg-accent transition-all"
-                    style={{ width: `${trade.trustScore}%` }}
-                  />
-                </div>
-              </div>
-              
-              {/* Key Metrics */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg border border-border bg-background p-3">
-                  <p className="text-[10px] text-muted-foreground">Win Likelihood</p>
-                  <p className="font-mono text-lg font-bold text-foreground">{trade.winLikelihoodPct}%</p>
-                </div>
-                <div className="rounded-lg border border-border bg-background p-3">
-                  <p className="text-[10px] text-muted-foreground">Kelly Fraction</p>
-                  <p className="font-mono text-lg font-bold text-foreground">{trade.auditAdvanced.kellyFinal}</p>
-                </div>
-              </div>
-              
-              {/* Rationale */}
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold text-muted-foreground">WHY THIS TRADE</p>
-                <p className="text-xs text-foreground leading-relaxed">{trade.bullets.why}</p>
-              </div>
-              
-              {/* Risk */}
-              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
-                <p className="mb-2 text-[10px] font-bold text-warning">RISK NOTE</p>
-                <p className="text-xs text-foreground leading-relaxed">{trade.bullets.risk}</p>
-              </div>
-            </div>
-          )}
-          
-          {activeTab === "ai" && aiConsensus && (
-            <div className="space-y-4">
-              {/* Consensus Strength */}
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Consensus Strength</span>
-                  <span className="font-mono text-lg font-bold text-accent">
-                    {aiConsensus.consensusStrength}%
-                  </span>
-                </div>
-                <p className="mt-1 text-[10px] text-muted-foreground">
-                  Final Verdict: <span className="font-medium text-foreground">{aiConsensus.finalVerdict}</span>
-                </p>
-              </div>
-              
-              {/* Individual AI Responses */}
-              {aiConsensus.groq && (
-                <AIResponseCard 
-                  name="Groq (Llama 3.3 70B)" 
-                  response={aiConsensus.groq}
-                  color="accent"
-                />
-              )}
-              {aiConsensus.openai && (
-                <AIResponseCard 
-                  name="OpenAI (GPT-4o-mini)" 
-                  response={aiConsensus.openai}
-                  color="blue"
-                />
-              )}
-              {aiConsensus.anthropic && (
-                <AIResponseCard 
-                  name="Anthropic (Claude Haiku)" 
-                  response={aiConsensus.anthropic}
-                  color="orange"
-                />
-              )}
-            </div>
-          )}
-          
-          {activeTab === "gates" && gates && (
-            <div className="space-y-2">
-              {gates.map((gate, i) => (
-                <div 
-                  key={i}
-                  className={`flex items-center justify-between rounded-lg border p-3 ${
-                    gate.passed 
-                      ? "border-accent/30 bg-accent/5" 
-                      : "border-danger/30 bg-danger/5"
-                  }`}
-                >
-                  <div>
-                    <p className="text-xs font-medium text-foreground">{gate.name}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {gate.value} {gate.passed ? "≥" : "<"} {gate.threshold}
-                    </p>
-                  </div>
-                  <span className={`text-lg ${gate.passed ? "text-accent" : "text-danger"}`}>
-                    {gate.passed ? "✓" : "✗"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        {/* Footer */}
-        <div className="border-t border-border p-4">
-          <button
-            onClick={onClose}
-            className="w-full rounded-lg bg-muted py-3 text-sm font-medium text-foreground transition-colors hover:bg-muted/80"
-          >
-            Close Receipt
-          </button>
-        </div>
-      </div>
+          <button className="rounded border border-slate-700 px-2 py-1 text-xs" onClick={onClose}>
+type TabId = "summary" | "regime" | "risk" | "deliberation" | "scoring"
+
+function verdictColor(v: string) {
+  if (v === "GO") return "bg-accent/20 text-accent"
+  if (v === "WAIT") return "bg-warning/20 text-warning"
+  return "bg-danger/20 text-danger"
+}
+
+function ScoreBar({ value, max = 100 }: { value: number; max?: number }) {
+  const pct = Math.max(0, Math.min(100, (value / max) * 100))
+  return (
+    <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
+      <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
     </div>
   )
 }
 
-function AIResponseCard({ 
-  name, 
-  response, 
-  color 
-}: { 
-  name: string
-  response: { decision: string; confidence: number; reasoning: string }
-  color: string
-}) {
-  const colorClasses = {
-    accent: "border-accent/30 bg-accent/5",
-    blue: "border-blue-500/30 bg-blue-500/5",
-    orange: "border-orange-500/30 bg-orange-500/5",
+export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) {
+  const [activeTab, setActiveTab] = useState<TabId>("summary")
+
+  if (!isOpen || !receipt) return null
+
+  const { proofBundle: pb, executedAt } = receipt
+
+  const tabs: { id: TabId; label: string }[] = [
+    { id: "summary", label: "Summary" },
+    { id: "regime", label: "Regime" },
+    { id: "risk", label: "Risk" },
+    { id: "deliberation", label: "AI Rounds" },
+    { id: "scoring", label: "Score" },
+  ]
+
+  function handleExport() {
+    const blob = new Blob([JSON.stringify(pb, null, 2)], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `tradeswarm-proof-${pb.ticker}-${pb.requestId.slice(0, 8)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
   }
-  
+
   return (
-    <div className={`rounded-lg border p-3 ${colorClasses[color as keyof typeof colorClasses]}`}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-foreground">{name}</span>
-        <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
-          response.decision === "GO" ? "bg-accent/20 text-accent" :
-          response.decision === "WAIT" ? "bg-warning/20 text-warning" :
-          "bg-danger/20 text-danger"
-        }`}>
-          {response.decision}
-        </span>
-      </div>
-      <div className="mt-2 flex items-center gap-2">
-        <span className="text-[10px] text-muted-foreground">Confidence:</span>
-        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-          <div 
-            className="h-full rounded-full bg-accent"
-            style={{ width: `${response.confidence}%` }}
-          />
+    <div className="fixed inset-0 z-50">
+      <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute bottom-0 left-0 right-0 z-50 max-h-[90vh] overflow-hidden rounded-t-2xl bg-card">
+        <div className="flex justify-center py-3">
+          <div className="h-1 w-10 rounded-full bg-border" />
         </div>
-        <span className="font-mono text-[10px] text-foreground">{response.confidence}%</span>
+
+        <div className="border-b border-border px-4 pb-3">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${verdictColor(pb.finalDecision.action)}`}>
+                  {pb.finalDecision.action}
+                </span>
+                {pb.engineDegraded && (
+                  <span className="rounded bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning">degraded</span>
+                )}
+              </div>
+              <h2 className="mt-1.5 font-mono text-2xl font-bold text-foreground">{pb.ticker}</h2>
+              <p className="text-[10px] text-muted-foreground">
+                {executedAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} ET · v{pb.engineVersion}
+              </p>
+            </div>
+            <div className="shrink-0 text-right">
+              <p className="font-mono text-xl font-bold text-accent">${pb.finalDecision.recommendedAmount?.toLocaleString() ?? "—"}</p>
+              <p className="text-[10px] text-muted-foreground">recommended</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex overflow-x-auto border-b border-border">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`shrink-0 px-3 py-3 text-[11px] font-medium uppercase tracking-wider ${
+                activeTab === tab.id ? "border-b-2 border-accent text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="max-h-[52vh] space-y-3 overflow-y-auto p-4 text-xs">
+          {activeTab === "summary" && (
+            <>
+              <div className="rounded-lg border border-border bg-background p-3">
+                <p className="text-muted-foreground">Reason</p>
+                <p className="mt-1 text-foreground">{pb.finalDecision.reason}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Trust Score</span>
+                  <span className="font-mono font-bold text-foreground">{pb.finalDecision.trustScore}/100</span>
+                </div>
+                <ScoreBar value={pb.finalDecision.trustScore} />
+              </div>
+            </>
+          )}
+
+          {activeTab === "regime" && (
+            <div className="rounded-lg border border-border bg-background p-3">
+              <p>Trend: {pb.regime.trend}</p>
+              <p>Volatility: {pb.regime.volatility}</p>
+              <p>Momentum: {pb.regime.momentum}</p>
+              <p>Confidence: {(pb.regime.confidence * 100).toFixed(0)}%</p>
+            </div>
+          )}
+
+          {activeTab === "risk" && (
+            <div className="rounded-lg border border-border bg-background p-3">
+              <p>Risk level: {pb.risk.riskLevel}</p>
+              <p>Kelly fraction: {pb.risk.kellyFraction.toFixed(3)}</p>
+              <p>Position size: ${pb.risk.positionSizeRecommended.toFixed(2)}</p>
+              <p>Max drawdown: {(pb.risk.maxDrawdown * 100).toFixed(2)}%</p>
+            </div>
+          )}
+
+          {activeTab === "deliberation" && (
+            <div className="space-y-2">
+              {pb.deliberation.map((round) => (
+                <div key={round.roundId} className="rounded-lg border border-border bg-background p-3">
+                  <p className="font-semibold">{round.stage}</p>
+                  <p className="text-muted-foreground">{round.outcome.reason}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeTab === "scoring" && (
+            <div className="rounded-lg border border-border bg-background p-3">
+              <p>Raw Avg: {pb.scoring.rawAvgScore.toFixed(2)}</p>
+              <p>Agreement: {(pb.scoring.agreementRatio * 100).toFixed(1)}%</p>
+              <p>Penalty: {(pb.scoring.penaltyFactor * 100).toFixed(1)}%</p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex gap-2 border-t border-border p-3">
+          <button onClick={handleExport} className="flex-1 rounded-lg border border-border py-2.5 text-xs font-medium text-muted-foreground">
+            Export Proof
+          </button>
+          <button onClick={onClose} className="flex-1 rounded-lg bg-muted py-2.5 text-xs font-medium text-foreground">
+            Close
+          </button>
+        </div>
+
+        <section className="mb-4 rounded border border-slate-800 p-3">
+          <p className="text-xs text-slate-400">Decision</p>
+          <p className={`text-lg font-semibold ${verdictColor(finalDecision.action)}`}>{finalDecision.action}</p>
+          <p className="text-sm text-slate-200">{finalDecision.reason}</p>
+          <p className="mt-2 text-xs text-slate-400">
+            Trust {finalDecision.trustScore} · Recommended ${finalDecision.recommendedAmount ?? 0}
+          </p>
+        </section>
+
+        <section className="mb-4 rounded border border-slate-800 p-3">
+          <p className="mb-2 text-xs text-slate-400">Preflight gates</p>
+          <ul className="space-y-1 text-sm">
+            {proofBundle.preflight.gates.map((gate) => (
+              <li key={gate.name}>
+                <span className={gate.passed ? "text-emerald-400" : "text-rose-400"}>{gate.passed ? "✓" : "✕"}</span>{" "}
+                {gate.name} — {gate.reason}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded border border-slate-800 p-3">
+          <p className="mb-2 text-xs text-slate-400">Determinism</p>
+          <p className="text-xs text-slate-300">Request ID: {proofBundle.requestId}</p>
+          <p className="text-xs text-slate-300">Monte Carlo seed: {proofBundle.risk.monteCarloSeed}</p>
+        </section>
       </div>
-      <p className="mt-2 text-[10px] text-muted-foreground leading-relaxed">{response.reasoning}</p>
     </div>
   )
 }
