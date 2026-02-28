@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { runCanonicalTrade } from "@/lib/engine/runCanonicalTrade"
 
 export async function POST(req: Request) {
   try {
@@ -11,71 +12,38 @@ export async function POST(req: Request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { trade, aiConsensus, regime, risk } = await req.json()
-
-    if (!trade) {
-      return Response.json({ error: "Trade data is required" }, { status: 400 })
+    const { ticker, theme, amount: requestedAmount, marketContext } = await req.json()
+    if (!ticker) {
+      return Response.json({ error: "ticker is required" }, { status: 400 })
     }
 
-    const tradeRecord = {
-      user_id: user.id,
-      ticker: trade.ticker,
-      strategy: trade.strategy || "options_spread",
-      action: "simulate",
-      amount: trade.amountDollars || 0,
-      trust_score: trade.trustScore,
-      status: trade.status,
-      is_paper: true,
-      reasoning: trade.bullets?.why || "",
-      ai_consensus: aiConsensus || null,
-      regime_data: regime || null,
-      risk_data: risk || null,
-    }
+    const [{ data: portfolioStats }, { data: preferences }] = await Promise.all([
+      supabase.from("portfolio_stats").select("balance").eq("user_id", user.id).single(),
+      supabase.from("user_preferences").select("safety_mode").eq("user_id", user.id).single(),
+    ])
 
-    const { data: insertedTrade, error: insertError } = await supabase
-      .from("trades")
-      .insert(tradeRecord)
-      .select()
-      .single()
+    const balance = Number(portfolioStats?.balance ?? 10000)
+    const safetyMode = String(preferences?.safety_mode ?? "training_wheels")
+    const amount = Number(requestedAmount ?? Math.round(balance * 0.015 * 100) / 100)
 
-    if (insertError) {
-      console.error("Trade simulate error:", insertError)
-      return Response.json({ error: "Failed to record simulation" }, { status: 500 })
-    }
-
-    const executedAt = new Date().toISOString()
-    const receiptRecord = {
-      trade_id: insertedTrade.id,
-      user_id: user.id,
-      ticker: trade.ticker,
-      action: "simulate",
-      amount: trade.amountDollars,
-      trust_score: trade.trustScore,
-      executed_at: executedAt,
-      ai_consensus: aiConsensus,
-      regime_snapshot: regime,
-      risk_snapshot: risk,
-    }
-
-    await supabase.from("trade_receipts").insert(receiptRecord)
-
-    const { data: stats } = await supabase
-      .from("portfolio_stats")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
-
-    await supabase.from("portfolio_stats").upsert({
-      user_id: user.id,
-      simulations_completed: (stats?.simulations_completed || 0) + 1,
-      updated_at: new Date().toISOString(),
+    const result = await runCanonicalTrade({
+      mode: "simulate",
+      ticker,
+      userId: user.id,
+      amount,
+      balance,
+      safetyMode,
+      theme,
+      userContext: marketContext,
     })
 
     return Response.json({
-      success: true,
-      trade: insertedTrade,
-      receipt: receiptRecord,
-      message: `Simulated: ${trade.ticker} for $${trade.amountDollars}`,
+      success: !result.blocked,
+      blocked: result.blocked,
+      tradeId: result.tradeId,
+      receiptId: result.receiptId,
+      proofBundle: result.proofBundle,
+      legacyProofBundle: result.legacyProofBundle,
       isSimulation: true,
     })
   } catch (error) {

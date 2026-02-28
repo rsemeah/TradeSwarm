@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin"
+import { updateThresholds } from "@/lib/calibration/updateThresholds"
 
 function authorized(req: Request) {
   const expected = process.env.INTERNAL_JOBS_TOKEN
@@ -23,19 +24,11 @@ export async function POST(req: Request) {
       return Response.json({ error: "Unauthorized" }, { status: 401 })
     }
 
+    const thresholdUpdate = await updateThresholds()
     const supabase = createAdminClient()
 
-    const { data: trackingConfig } = await supabase
-      .from("outcome_tracking_configs")
-      .select("recalibration_window_days")
-      .eq("is_active", true)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    const windowDays = trackingConfig?.recalibration_window_days || 90
     const start = new Date()
-    start.setDate(start.getDate() - windowDays)
+    start.setDate(start.getDate() - thresholdUpdate.windowDays)
 
     const { data: dataset, error: datasetError } = await supabase
       .from("model_calibration_datasets")
@@ -46,7 +39,7 @@ export async function POST(req: Request) {
 
     const rows = (dataset || []) as DatasetRow[]
     if (!rows.length) {
-      return Response.json({ success: true, message: "No data available for recalibration", windowDays })
+      return Response.json({ success: true, message: "No data available for recalibration", thresholdUpdate })
     }
 
     const grouped = new Map<string, DatasetRow[]>()
@@ -88,11 +81,7 @@ export async function POST(req: Request) {
         weights: normalizedWeights,
         config_meta: {
           source: "periodic_recalibration",
-          windowDays,
-          modelBrier: inverseScores.reduce<Record<string, number>>((acc, score) => {
-            acc[score.key] = Number(score.brier.toFixed(5))
-            return acc
-          }, {}),
+          thresholdUpdate,
         },
         is_active: true,
         created_by: "recalibration_job",
@@ -107,21 +96,21 @@ export async function POST(req: Request) {
       previous_version: currentConfig?.version || null,
       new_version: insertedConfig.version,
       triggered_by: "recalibration_job",
-      change_summary: "Updated model weights from rolling calibration dataset",
+      change_summary: "Updated model weights and calibration thresholds from rolling dataset",
       metrics_snapshot: {
-        windowDays,
         sampleSize: rows.length,
         previousWeights: currentConfig?.weights || null,
         newWeights: normalizedWeights,
+        thresholdUpdate,
       },
     })
 
     return Response.json({
       success: true,
-      windowDays,
       version: nextVersion,
       sampleSize: rows.length,
       weights: normalizedWeights,
+      thresholdUpdate,
     })
   } catch (error) {
     console.error("Recalibration job error", error)

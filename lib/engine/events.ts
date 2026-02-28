@@ -1,3 +1,52 @@
+import { createClient } from "@/lib/supabase/server"
+import type { EngineEventMinimal, EngineStatus } from "@/lib/types/proof"
+
+interface EmitParams {
+  requestId: string
+  userId?: string
+  name: string
+  stage: string
+  status: EngineStatus
+  ticker?: string
+  payload?: Record<string, unknown>
+  durationMs?: number
+}
+
+export async function emitEngineEvent(params: EmitParams): Promise<EngineEventMinimal> {
+  const id = crypto.randomUUID()
+  const ts = new Date().toISOString()
+
+  const event: EngineEventMinimal = {
+    id,
+    requestId: params.requestId,
+    name: params.name,
+    stage: params.stage,
+    status: params.status,
+    durationMs: params.durationMs,
+    ts,
+  }
+
+  try {
+    const supabase = await createClient()
+    await supabase.from("engine_events").insert({
+      id,
+      request_id: params.requestId,
+      user_id: params.userId ?? null,
+      name: params.name,
+      stage: params.stage,
+      status: params.status,
+      ticker: params.ticker ?? null,
+      payload: params.payload ?? {},
+      duration_ms: params.durationMs ?? null,
+      created_at: ts,
+    })
+  } catch (error) {
+    console.error("[engine_events] persist failed:", error)
+  }
+
+  return event
+}
+
 export const ENGINE_STAGES = [
   "CONTEXT_DONE",
   "REGIME_DONE",
@@ -23,7 +72,7 @@ export interface StageEventInput {
   details?: Record<string, unknown>
 }
 
-export async function recordStageEvent(supabase: any, input: StageEventInput) {
+export async function recordStageEvent(supabase: { from: (table: string) => { insert: (payload: Record<string, unknown>) => Promise<{ error: { message?: string } | null }> } }, input: StageEventInput) {
   const { error } = await supabase.from("engine_events").insert({
     user_id: input.userId ?? null,
     event_type: input.stage,
@@ -39,32 +88,5 @@ export async function recordStageEvent(supabase: any, input: StageEventInput) {
 
   if (error) {
     console.error(`Failed to write engine event ${input.stage}:`, error.message || error)
-  }
-}
-
-export interface DegradedModeDecision {
-  isDegraded: boolean
-  executeBlocked: boolean
-  warnings: string[]
-  reasonCode: string | null
-}
-
-const CRITICAL_FAILURE_REASON_CODES = new Set([
-  "CONTEXT_FAILED",
-  "REGIME_FAILED",
-  "RISK_FAILED",
-  "ROUND1_FAILED",
-  "SCORING_FAILED",
-])
-
-export function evaluateDegradedMode(reasonCodes: string[]): DegradedModeDecision {
-  const filtered = reasonCodes.filter(Boolean)
-  const executeBlocked = filtered.some((code) => CRITICAL_FAILURE_REASON_CODES.has(code))
-
-  return {
-    isDegraded: filtered.length > 0,
-    executeBlocked,
-    warnings: filtered.map((code) => `Engine degraded: ${code}`),
-    reasonCode: filtered[0] || null,
   }
 }

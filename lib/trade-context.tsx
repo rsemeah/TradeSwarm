@@ -50,10 +50,14 @@ export function TradeProvider({ children }: { children: ReactNode }) {
     }))
 
     try {
-      const response = await fetch("/api/trade", {
+      const response = await fetch("/api/trade/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "execute", trade }),
+        body: JSON.stringify({
+          ticker: trade.ticker,
+          theme: trade.strategy,
+          amount: trade.amountDollars,
+        }),
       })
 
       const data = await response.json()
@@ -62,6 +66,8 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         ...s,
         isLoading: false,
         lastResult: {
+          success: response.ok && data.success,
+          message: data.message || data.reason || data.error || "Trade executed",
           success: response.ok,
           message: data.message || data.error || "Trade executed",
           reasonCode: data.reasonCode,
@@ -72,10 +78,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
       setState((s) => ({
         ...s,
         isLoading: false,
-        lastResult: {
-          success: false,
-          message: String(error),
-        },
+        lastResult: { success: false, message: String(error) },
       }))
     }
   }, [])
@@ -88,10 +91,14 @@ export function TradeProvider({ children }: { children: ReactNode }) {
     }))
 
     try {
-      const response = await fetch("/api/trade", {
+      const response = await fetch("/api/trade/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "simulate", trade }),
+        body: JSON.stringify({
+          ticker: trade.ticker,
+          theme: trade.strategy,
+          amount: trade.amountDollars,
+        }),
       })
 
       const data = await response.json()
@@ -100,7 +107,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         ...s,
         isLoading: false,
         lastResult: {
-          success: response.ok,
+          success: response.ok && data.success,
           message: data.message || data.error || "Simulation recorded",
           reasonCode: data.reasonCode,
           data,
@@ -110,10 +117,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
       setState((s) => ({
         ...s,
         isLoading: false,
-        lastResult: {
-          success: false,
-          message: String(error),
-        },
+        lastResult: { success: false, message: String(error) },
       }))
     }
   }, [])
