@@ -156,3 +156,86 @@ export interface ScanResult {
     C: number
   }
 }
+
+export interface TruthSerumFeaturesV1 {
+  ticker: string
+  strategy: string
+  dte: number
+  width: number
+  credit: number
+  iv_rank?: number | null
+  regime?: string | null
+  liquidity_score?: number | null
+}
+
+export interface ModelRound {
+  round_id: string
+  stage: string
+  providers: Array<{
+    provider: string
+    model_version: string
+    decision: string
+    confidence: number
+    reasoning: string
+  }>
+  outcome: {
+    decision: string
+    reason: string
+    consensus_strength: number
+  }
+  ts: string
+}
+
+export interface SafetyDecision {
+  safety_status: "ALLOWED" | "BLOCKED"
+  reason_code: string | null
+  reasons: string[]
+  max_size_hint: number
+}
+
+export interface DeterminismContext {
+  market_snapshot_ref: string | null
+  market_snapshot_hash: string
+  engine_version: string
+  config_hash: string
+  determinism_hash: string
+  random_seed: number | null
+}
+
+export interface CanonicalProofBundle {
+  version: string
+  model_provider: string
+  model_version: string
+  regime_snapshot: Record<string, unknown>
+  risk_snapshot: Record<string, unknown>
+  safety_decision: SafetyDecision
+  model_rounds: ModelRound[]
+  consensus_score: number
+  trust_score: number
+  execution_mode: string
+  timestamp: string
+  input_snapshot: {
+    ticker: string
+    requested_amount: number
+    balance: number
+    safety_mode?: string
+    theme?: string
+    user_context?: string
+  }
+  market_snapshot: {
+    quote: unknown
+    chain: unknown
+    provider_health: unknown
+    as_of: string
+    source?: string
+    latency_ms?: number
+  }
+  metadata?: {
+    request_id?: string
+    engine_version?: string
+    warnings?: string[]
+    safety_status?: string
+    reason_code?: string | null
+    determinism?: DeterminismContext
+  }
+}
