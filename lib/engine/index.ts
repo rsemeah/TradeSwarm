@@ -41,7 +41,7 @@ export type {
 } from "@/lib/types/proof"
 
 // ─── Legacy (radar screen analysis — no orchestrator, no DB writes) ────────
-export { runTradeSwarm } from "./runTradeSwarm"
+export { runTradeSwarm as runLegacyTradeSwarm } from "./runTradeSwarm"
 export type { TradeSwarmProofBundle, RunTradeSwarmMode } from "./runTradeSwarm"
 
 import { detectRegime, regimeToContext } from "./regime"

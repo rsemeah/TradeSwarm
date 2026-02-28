@@ -12,6 +12,7 @@ export interface ScanConfig {
 }
 
 export interface RawCandidate {
+  id?: string
   ticker: string
   underlying_price: number
   strategy: Strategy
@@ -44,3 +45,19 @@ export interface FilterResult {
 }
 
 export type FilterCounts = Record<string, number>
+
+export interface RankedDeal {
+  candidate: RawCandidate
+  score: { display: string; value: number }
+  ror: number
+  contracts: number
+  stress?: unknown
+  truthSerum?: unknown
+  news: { macroFlags: string[] }
+}
+
+export interface ScanResult {
+  empty: boolean
+  reason?: string
+  deals: RankedDeal[]
+}

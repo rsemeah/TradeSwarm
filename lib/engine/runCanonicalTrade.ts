@@ -33,7 +33,7 @@ interface PersistedMarketSnapshot {
 
 function buildModelRounds(bundle: ProofBundle): ModelRound[] {
   return bundle.deliberation.map((round) => ({
-    round_id: round.roundId,
+    round_id: String(round.roundId),
     stage: round.stage,
     providers: round.outputs.map((output) => ({
       provider: output.provider,
@@ -110,7 +110,7 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
     provider_health: bundle.marketContext.providerHealth,
     as_of: bundle.marketContext.ts,
     source: "orchestrator.marketContext",
-    latency_ms: null,
+    latency_ms: undefined,
   }
 
   const marketSnapshotHash = hashDeterministic(normalizedMarketSnapshot)
@@ -132,8 +132,8 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
     version: "v2",
     model_provider: firstOutput?.provider ?? "unknown",
     model_version: firstOutput?.model_version ?? "unknown",
-    regime_snapshot: bundle.regime,
-    risk_snapshot: bundle.risk,
+    regime_snapshot: bundle.regime as unknown as Record<string, unknown>,
+    risk_snapshot: bundle.risk as unknown as Record<string, unknown>,
     safety_decision: safetyDecision,
     model_rounds: modelRounds,
     consensus_score: modelRounds[modelRounds.length - 1]?.outcome.consensus_strength ?? 0,
