@@ -1,5 +1,3 @@
-import { generateText, Output } from "ai"
-import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { runEngineAnalysis, preflightCheck } from "@/lib/engine"
 import { evaluateDegradedMode, recordStageEvent } from "@/lib/engine/events"
@@ -32,6 +30,7 @@ const PreviewSchema = z.object({
     })
     .nullable(),
 })
+import { runTradeSwarm } from "@/lib/engine"
 
 export async function POST(req: Request) {
   const correlationId = crypto.randomUUID()
@@ -160,10 +159,22 @@ Provide rapid assessment with status, trust score, bullets, and position sizing.
       correlationId,
       reasonCode: degradedMode.reasonCode,
       preview,
+    const { proofBundle } = await runTradeSwarm({
+      mode: "preview",
+      ticker,
+      theme,
+      marketContext,
+      useSwarm: false,
+      userId: user.id,
+    })
+
+    return Response.json({
+      success: true,
+      preview: proofBundle.decision,
       engine: {
-        regime: engineAnalysis.regime,
-        risk: engineAnalysis.risk,
-        preflight,
+        regime: proofBundle.regime,
+        risk: proofBundle.risk,
+        preflight: proofBundle.preflight,
       },
       degradedMode: {
         ...degradedMode,
@@ -173,11 +184,12 @@ Provide rapid assessment with status, trust score, bullets, and position sizing.
         },
       },
       meta: {
-        balance,
-        safetyMode,
-        timestamp: new Date().toISOString(),
-        model: "groq/llama-3.3-70b-versatile",
+        balance: proofBundle.meta.balance,
+        safetyMode: proofBundle.meta.safetyMode,
+        timestamp: proofBundle.timestamp,
+        model: proofBundle.meta.modelPlan[0],
       },
+      proofBundle,
     })
   } catch (error) {
     console.error("Preview error:", error)

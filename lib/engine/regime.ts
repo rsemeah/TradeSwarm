@@ -1,7 +1,16 @@
 /**
  * Regime Detection Module
  * Analyzes market conditions using free Yahoo Finance data
+ * Uses circuit breaker pattern for resilience
  */
+
+import { 
+  fetchWithTimeout, 
+  circuitAllow, 
+  circuitSuccess, 
+  circuitFail,
+  getCircuitState 
+} from "@/lib/adapters/http"
 
 export type Trend = "bullish" | "bearish" | "neutral"
 export type Volatility = "low" | "medium" | "high"
@@ -32,27 +41,40 @@ interface QuoteData {
   twoHundredDayAverage: number
 }
 
+const CIRCUIT_KEY = "yahoo_finance"
+
 /**
- * Fetch basic quote data from Yahoo Finance
+ * Fetch basic quote data from Yahoo Finance with circuit breaker
  */
 async function fetchQuoteData(ticker: string): Promise<QuoteData | null> {
+  // Check circuit breaker - if open, fail fast
+  if (!circuitAllow(CIRCUIT_KEY, { maxFailures: 3, openMs: 30_000 })) {
+    console.warn(`Circuit breaker open for Yahoo Finance, skipping ${ticker}`)
+    return null
+  }
+
   try {
     const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=60d`
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         "User-Agent": "Mozilla/5.0",
       },
+      timeoutMs: 3000, // 3 second timeout for market data
     })
 
     if (!response.ok) {
       console.error(`Yahoo Finance error for ${ticker}:`, response.status)
+      circuitFail(CIRCUIT_KEY)
       return null
     }
 
     const data = await response.json()
     const result = data.chart?.result?.[0]
     
-    if (!result) return null
+    if (!result) {
+      circuitFail(CIRCUIT_KEY)
+      return null
+    }
 
     const meta = result.meta
     const closes = result.indicators?.quote?.[0]?.close || []
@@ -70,6 +92,9 @@ async function fetchQuoteData(ticker: string): Promise<QuoteData | null> {
       ? recentVolumes.reduce((a: number, b: number) => a + b, 0) / recentVolumes.length
       : meta.regularMarketVolume
 
+    // Success - reset circuit breaker
+    circuitSuccess(CIRCUIT_KEY)
+
     return {
       regularMarketPrice: meta.regularMarketPrice,
       regularMarketPreviousClose: meta.previousClose || meta.regularMarketPrice,
@@ -80,8 +105,16 @@ async function fetchQuoteData(ticker: string): Promise<QuoteData | null> {
     }
   } catch (error) {
     console.error(`Failed to fetch quote for ${ticker}:`, error)
+    circuitFail(CIRCUIT_KEY)
     return null
   }
+}
+
+/**
+ * Get the current circuit breaker status for Yahoo Finance
+ */
+export function getMarketDataCircuitStatus() {
+  return getCircuitState(CIRCUIT_KEY)
 }
 
 /**

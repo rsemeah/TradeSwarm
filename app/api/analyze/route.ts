@@ -2,6 +2,8 @@ import { generateText, Output } from "ai"
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { recordStageEvent } from "@/lib/engine/events"
+import { runEngineAnalysis } from "@/lib/engine"
+import { calculateCredibilityScore } from "@/lib/scoring/credibility"
 
 // Schema for trade analysis output
 const TradeAnalysisSchema = z.object({
@@ -97,6 +99,7 @@ Provide:
 
   return result.output
 }
+import { runTradeSwarm } from "@/lib/engine"
 
 export async function POST(req: Request) {
   const correlationId = crypto.randomUUID()
@@ -104,6 +107,7 @@ export async function POST(req: Request) {
 
   try {
     const supabase = await createClient()
+    const startedAt = Date.now()
     const { ticker, theme, marketContext, useSwarm = true } = await req.json()
 
     if (!ticker) {
@@ -224,6 +228,58 @@ export async function POST(req: Request) {
         reasonCode: "ARBITRATION_SKIPPED",
       })
     }
+    const { proofBundle } = await runTradeSwarm({
+      mode: "analyze",
+      ticker,
+      theme,
+      marketContext,
+      useSwarm,
+    })
+
+    const engineAnalysis = await runEngineAnalysis(ticker, 150, 10000, finalAnalysis.trustScore)
+    const uniqueDecisions = new Set(successfulAnalyses.map((a) => a.analysis.status))
+    const majorityDecision =
+      successfulAnalyses
+        .map((a) => a.analysis.status)
+        .sort(
+          (a, b) =>
+            successfulAnalyses.filter((x) => x.analysis.status === b).length -
+            successfulAnalyses.filter((x) => x.analysis.status === a).length
+        )[0] || finalAnalysis.status
+    const agreementRatio =
+      successfulAnalyses.filter((a) => a.analysis.status === majorityDecision).length /
+      Math.max(successfulAnalyses.length, 1)
+
+    const credibility = calculateCredibilityScore({
+      baseTrustScore: finalAnalysis.trustScore,
+      deliberation: {
+        agreementRatio,
+        arbitrationUsed: !!consensus,
+        dissentCount: Math.max(uniqueDecisions.size - 1, 0),
+      },
+      regime: {
+        confidence: engineAnalysis.regime.confidence,
+        volatility: engineAnalysis.regime.volatility,
+      },
+      risk: {
+        grade: engineAnalysis.risk.riskLevel,
+      },
+      liquidity: {
+        volumeRatio: engineAnalysis.regime.signals.volumeRatio,
+        spreadProxy:
+          engineAnalysis.regime.volatility === "low"
+            ? 0.2
+            : engineAnalysis.regime.volatility === "medium"
+              ? 0.45
+              : 0.75,
+      },
+      freshness: {
+        marketDataAgeMs: Date.now() - new Date(engineAnalysis.regime.timestamp).getTime(),
+        modelDataAgeMs: Date.now() - startedAt,
+      },
+    })
+
+    finalAnalysis.trustScore = credibility.trustScore
 
     await recordStageEvent(supabase, {
       stage: "SCORING_DONE",
@@ -239,6 +295,11 @@ export async function POST(req: Request) {
       correlationId,
       analysis: finalAnalysis,
       consensus,
+      credibility,
+      engine: {
+        regime: engineAnalysis.regime,
+        risk: engineAnalysis.risk,
+      },
       modelResults: successfulAnalyses.map((r) => ({
         model: r.model,
         status: r.analysis.status,
@@ -260,6 +321,28 @@ export async function POST(req: Request) {
         finalVerdict: consensus?.finalDecision || finalAnalysis.status,
         consensusStrength: consensus?.confidenceScore || finalAnalysis.trustScore,
       } : undefined,
+      analysis: proofBundle.decision,
+      consensus: proofBundle.consensus,
+      modelResults: proofBundle.modelResults,
+      aiConsensus: {
+        groq: proofBundle.modelResults.find((m) => m.model.includes("groq"))
+          ? {
+              decision: proofBundle.modelResults.find((m) => m.model.includes("groq"))!.status,
+              confidence: proofBundle.modelResults.find((m) => m.model.includes("groq"))!.trustScore,
+              reasoning: proofBundle.modelResults.find((m) => m.model.includes("groq"))!.reasoning,
+            }
+          : undefined,
+        openai: proofBundle.modelResults.find((m) => m.model.includes("openai"))
+          ? {
+              decision: proofBundle.modelResults.find((m) => m.model.includes("openai"))!.status,
+              confidence: proofBundle.modelResults.find((m) => m.model.includes("openai"))!.trustScore,
+              reasoning: proofBundle.modelResults.find((m) => m.model.includes("openai"))!.reasoning,
+            }
+          : undefined,
+        finalVerdict: proofBundle.consensus?.finalDecision || proofBundle.decision.status,
+        consensusStrength: proofBundle.consensus?.confidenceScore || proofBundle.decision.trustScore,
+      },
+      proofBundle,
     })
   } catch (error) {
     console.error("Analysis error:", error)
