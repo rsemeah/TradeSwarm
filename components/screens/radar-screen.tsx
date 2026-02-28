@@ -83,7 +83,7 @@ export function RadarScreen({ onNavigateToTrades }: RadarScreenProps) {
 
       {/* Loading indicator when analyzing */}
       {state.analysisInProgress && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 backdrop-blur-sm">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/90 backdrop-blur-sm">
           <div className="rounded-lg bg-card border border-border p-8 text-center">
             <div className="mb-4 flex justify-center">
               <Logo variant="icon" size="lg" className="animate-pulse" />
