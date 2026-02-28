@@ -2,12 +2,28 @@
 
 import { useState } from "react"
 import type { ProofBundle } from "@/lib/types/proof"
+import type { TradeCandidate, TradeScoringDetail } from "@/lib/types"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface ReceiptData {
   proofBundle: ProofBundle
   executedAt: Date
+  isSimulation: boolean
+  aiConsensus?: {
+    groq?: { decision: string; confidence: number; reasoning: string }
+    openai?: { decision: string; confidence: number; reasoning: string }
+    anthropic?: { decision: string; confidence: number; reasoning: string }
+    finalVerdict: string
+    consensusStrength: number
+  }
+  scoring?: TradeScoringDetail
+  gates?: {
+    name: string
+    passed: boolean
+    value: string
+    threshold: string
+  }[]
 }
 
 interface ReceiptDrawerProps {
@@ -92,6 +108,11 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
     a.click()
     URL.revokeObjectURL(url)
   }
+  const [activeTab, setActiveTab] = useState<"decision" | "explain" | "provenance">("decision")
+
+  if (!isOpen || !receipt) return null
+
+  const { trade, executedAt, isSimulation, aiConsensus, scoring, gates } = receipt
 
   return (
     <div className="fixed inset-0 z-50">
@@ -162,6 +183,8 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
         {/* Tabs */}
         <div className="flex overflow-x-auto border-b border-border">
           {tabs.map(({ id, label }) => (
+        <div className="flex border-b border-border">
+          {(["decision", "explain", "provenance"] as const).map((tab) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -172,6 +195,7 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
               }`}
             >
               {label}
+              {tab}
             </button>
           ))}
         </div>
@@ -182,6 +206,10 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
           {/* ── SUMMARY ─────────────────────────────────────────────── */}
           {activeTab === "summary" && (
             <>
+        <div className="max-h-[50vh] overflow-y-auto p-4">
+          {activeTab === "decision" && (
+            <div className="space-y-4">
+              {/* Trust Score */}
               <div className="rounded-lg border border-border bg-background p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Trust Score</span>
@@ -341,6 +369,87 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
                     Expirations: {pb.marketContext.chain.expirations.slice(0, 4).join(" · ")}
                   </p>
                 </div>
+              
+              {/* Decision */}
+              <div className="rounded-lg border border-border bg-background p-3">
+                <p className="mb-2 text-[10px] font-bold text-muted-foreground">DECISION</p>
+                <p className="text-xs text-foreground leading-relaxed">{trade.bullets.why}</p>
+              </div>
+
+              {scoring && (
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="mb-2 text-[10px] font-bold text-muted-foreground">SCORING EXPLANATION</p>
+                  {scoring.factors.slice(0, 4).map((factor) => (
+                    <div key={factor.name} className="flex items-center justify-between text-[10px]">
+                      <span className="text-muted-foreground">{factor.name}</span>
+                      <span className="font-mono text-foreground">{factor.impact >= 0 ? "+" : ""}{factor.impact}</span>
+                    </div>
+                  ))}
+                  <p className="mt-2 text-[10px] text-muted-foreground">{scoring.formula.policy}</p>
+                </div>
+              )}
+              
+              {/* Risk */}
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
+                <p className="mb-2 text-[10px] font-bold text-warning">RISK OVERLAY</p>
+                <p className="text-xs text-foreground leading-relaxed">{trade.bullets.risk}</p>
+              </div>
+
+              <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+                <p className="mb-2 text-[10px] font-bold text-accent">REGIME OVERLAY</p>
+                <p className="text-xs text-foreground leading-relaxed">
+                  Regime score {trade.auditAdvanced.regimeScore.toFixed(2)} supports a {trade.status} decision with liquidity score {trade.auditAdvanced.liquidityScore.toFixed(2)}.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "explain" && (
+            <div className="space-y-4">
+              {aiConsensus && (
+                <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Consensus Strength</span>
+                    <span className="font-mono text-lg font-bold text-accent">
+                      {aiConsensus.consensusStrength}%
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Final Verdict: <span className="font-medium text-foreground">{aiConsensus.finalVerdict}</span>
+                  </p>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-border bg-background p-3">
+                <p className="mb-2 text-[10px] font-bold text-muted-foreground">DELIBERATION TIMELINE</p>
+                <ol className="space-y-1 text-xs text-muted-foreground">
+                  <li>1. Candidate screened and scored for trust + win likelihood.</li>
+                  <li>2. Regime overlay applied against momentum and liquidity constraints.</li>
+                  <li>3. Risk overlay checked with Kelly and POP lower bound constraints.</li>
+                  <li>4. Final recommendation emitted as {trade.status}.</li>
+                </ol>
+              </div>
+
+              {aiConsensus?.groq && (
+                <AIResponseCard 
+                  name="Groq (Llama 3.3 70B)" 
+                  response={aiConsensus.groq}
+                  color="accent"
+                />
+              )}
+              {aiConsensus?.openai && (
+                <AIResponseCard 
+                  name="OpenAI (GPT-4o-mini)" 
+                  response={aiConsensus.openai}
+                  color="blue"
+                />
+              )}
+              {aiConsensus?.anthropic && (
+                <AIResponseCard 
+                  name="Anthropic (Claude Haiku)" 
+                  response={aiConsensus.anthropic}
+                  color="orange"
+                />
               )}
             </>
           )}
@@ -509,6 +618,22 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
                         ))}
                       </div>
                     )}
+          {activeTab === "provenance" && (
+            <div className="space-y-2">
+              <div className="rounded-lg border border-border bg-background p-3">
+                <p className="mb-2 text-[10px] font-bold text-muted-foreground">PROVENANCE</p>
+                <p className="text-xs text-muted-foreground">Decision artifacts are derived from trust metrics, gate checks, and AI consensus traces.</p>
+              </div>
+              {gates?.map((gate, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between rounded-lg border p-3 ${
+                    gate.passed ? "border-accent/30 bg-accent/5" : "border-danger/30 bg-danger/5"
+                  }`}
+                >
+                  <div>
+                    <p className="text-xs font-medium text-foreground">{gate.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{gate.value} {gate.passed ? "≥" : "<"} {gate.threshold}</p>
                   </div>
                 ))
               )}

@@ -16,6 +16,7 @@ interface TradeState {
   lastResult: {
     success: boolean
     message: string
+    reasonCode?: string
     data?: unknown
   } | null
   analysisInProgress: string | null // ticker being analyzed
@@ -67,6 +68,9 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         lastResult: {
           success: response.ok && data.success,
           message: data.message || data.reason || data.error || "Trade executed",
+          success: response.ok,
+          message: data.message || data.error || "Trade executed",
+          reasonCode: data.reasonCode,
           data,
         },
       }))
@@ -105,6 +109,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         lastResult: {
           success: response.ok && data.success,
           message: data.message || data.error || "Simulation recorded",
+          reasonCode: data.reasonCode,
           data,
         },
       }))
@@ -139,6 +144,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         lastResult: {
           success: response.ok,
           message: data.message || `Added ${ticker} to watchlist`,
+          reasonCode: data.reasonCode,
           data,
         },
       }))
@@ -190,6 +196,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
           lastResult: {
             success: false,
             message: data.error || "Analysis failed",
+            reasonCode: data.reasonCode,
           },
         }))
         return null
@@ -197,16 +204,18 @@ export function TradeProvider({ children }: { children: ReactNode }) {
 
       // Convert AI analysis to TradeCandidate format
       const analysis = data.analysis
+      const scoring = data.credibility
+      const regime = data.engine?.regime
       const candidate: TradeCandidate = {
         ticker: analysis.ticker,
         strategy: `${analysis.status === "NO" ? "Bearish" : "Bullish"} Spread - AI Analyzed`,
         status: analysis.status,
-        trustScore: analysis.trustScore,
+        trustScore: scoring?.trustScore ?? analysis.trustScore,
         winLikelihoodPct: analysis.winLikelihoodPct,
         amountDollars: analysis.recommendedAmount,
         bullets: analysis.bullets,
         auditSimple: {
-          trustScore: analysis.trustScore,
+          trustScore: scoring?.trustScore ?? analysis.trustScore,
           winLikelihood: analysis.winLikelihoodPct ? `${analysis.winLikelihoodPct}%` : "-",
           marketStability: analysis.status === "GO" ? "Good" : analysis.status === "WAIT" ? "Fair" : "Poor",
           fillQuality: analysis.status === "GO" ? "Good" : "Fair",
@@ -214,12 +223,12 @@ export function TradeProvider({ children }: { children: ReactNode }) {
           decision: analysis.status,
         },
         auditAdvanced: {
-          growthScore: analysis.trustScore / 100,
+          growthScore: (scoring?.trustScore ?? analysis.trustScore) / 100,
           netElr: "AI Calculated",
           popLowerBound: analysis.winLikelihoodPct ? `${analysis.winLikelihoodPct - 5}%` : "-",
           kellyFinal: analysis.recommendedAmount ? `${(analysis.recommendedAmount / 100).toFixed(1)}%` : "-",
-          regimeScore: analysis.trustScore / 100,
-          liquidityScore: 0.75,
+          regimeScore: regime?.confidence ?? (scoring?.trustScore ?? analysis.trustScore) / 100,
+          liquidityScore: Math.min(1, (regime?.signals?.volumeRatio ?? 1) / 1.5),
           gates: [
             { name: "AI Swarm Analysis", passed: true },
             { name: "Groq Analysis", passed: true },
@@ -228,6 +237,7 @@ export function TradeProvider({ children }: { children: ReactNode }) {
             { name: "Consensus Reached", passed: !!data.consensus },
           ],
         },
+        scoring,
       }
 
       return candidate

@@ -38,6 +38,48 @@ export async function POST(req: Request) {
     })
 
     // Update simulation counter
+    const tradeRecord = {
+      user_id: user.id,
+      ticker: trade.ticker,
+      strategy: trade.strategy || "options_spread",
+      action: "simulate",
+      amount: trade.amountDollars || 0,
+      trust_score: trade.trustScore,
+      status: trade.status,
+      is_paper: true,
+      reasoning: trade.bullets?.why || "",
+      ai_consensus: aiConsensus || null,
+      regime_data: regime || null,
+      risk_data: risk || null,
+    }
+
+    const { data: insertedTrade, error: insertError } = await supabase
+      .from("trades")
+      .insert(tradeRecord)
+      .select()
+      .single()
+
+    if (insertError) {
+      console.error("Trade simulate error:", insertError)
+      return Response.json({ error: "Failed to record simulation" }, { status: 500 })
+    }
+
+    const executedAt = new Date().toISOString()
+    const receiptRecord = {
+      trade_id: insertedTrade.id,
+      user_id: user.id,
+      ticker: trade.ticker,
+      action: "simulate",
+      amount: trade.amountDollars,
+      trust_score: trade.trustScore,
+      executed_at: executedAt,
+      ai_consensus: aiConsensus,
+      regime_snapshot: regime,
+      risk_snapshot: risk,
+    }
+
+    await supabase.from("trade_receipts").insert(receiptRecord)
+
     const { data: stats } = await supabase
       .from("portfolio_stats")
       .select("simulations_completed")
