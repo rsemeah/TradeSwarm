@@ -35,6 +35,22 @@ export interface AuditAdvanced {
   }[]
 }
 
+export interface TradeScoringDetail {
+  trustScore: number
+  factors: { name: string; impact: number; value: string | number; detail: string }[]
+  penalties: { name: string; impact: number; value: string | number; detail: string }[]
+  boosts: { name: string; impact: number; value: string | number; detail: string }[]
+  timestamp: string
+  formula: {
+    version: string
+    policy: string
+    expression: string
+    normalizedInputs: Record<string, number>
+    weights: Record<string, number>
+    clamp: { min: number; max: number; rounding: string }
+  }
+}
+
 export interface TradeCandidate {
   ticker: string
   strategy: string
@@ -45,6 +61,7 @@ export interface TradeCandidate {
   bullets: TradeBullets
   auditSimple: AuditSimple
   auditAdvanced: AuditAdvanced
+  scoring?: TradeScoringDetail
 }
 
 // Portfolio types for My Money screen
