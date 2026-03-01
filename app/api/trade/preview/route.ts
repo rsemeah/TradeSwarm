@@ -1,17 +1,27 @@
-import { createClient } from "@/lib/supabase/server"
 import { runCanonicalTrade } from "@/lib/engine/runCanonicalTrade"
+import { isLocalDevBypassEnabled } from "@/lib/env/devBypass"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(req: Request) {
   const correlationId = crypto.randomUUID()
 
   try {
     const supabase = await createClient()
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
 
-    if (!user) {
-      return Response.json({ error: "Unauthorized", reasonCode: "UNAUTHORIZED", correlationId }, { status: 401 })
+    let userId: string
+
+    if (isLocalDevBypassEnabled()) {
+      userId = "dev-user"
+    } else {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        return Response.json({ error: "Unauthorized", reasonCode: "UNAUTHORIZED", correlationId }, { status: 401 })
+      }
+
+      userId = user.id
     }
 
     const { ticker, theme, marketContext } = await req.json()
@@ -20,8 +30,8 @@ export async function POST(req: Request) {
     }
 
     const [{ data: preferences }, { data: portfolioStats }] = await Promise.all([
-      supabase.from("user_preferences").select("safety_mode").eq("user_id", user.id).single(),
-      supabase.from("portfolio_stats").select("balance").eq("user_id", user.id).single(),
+      supabase.from("user_preferences").select("safety_mode").eq("user_id", userId).single(),
+      supabase.from("portfolio_stats").select("balance").eq("user_id", userId).single(),
     ])
 
     const balance = Number(portfolioStats?.balance ?? 10000)
@@ -31,7 +41,7 @@ export async function POST(req: Request) {
     const result = await runCanonicalTrade({
       mode: "preview",
       ticker,
-      userId: user.id,
+      userId,
       amount,
       balance,
       safetyMode,
@@ -39,13 +49,21 @@ export async function POST(req: Request) {
       userContext: marketContext,
     })
 
+    const determinism = result.proofBundle.metadata?.determinism
+
     return Response.json({
       success: true,
       correlationId,
-      preview: result.proofBundle,
-      legacyPreview: result.legacyProofBundle,
+      tradeId: result.tradeId,
+      trade_id: result.tradeId,
       receiptId: result.receiptId,
       blocked: result.blocked,
+      determinism_hash: determinism?.determinism_hash ?? null,
+      market_snapshot_hash: determinism?.market_snapshot_hash ?? null,
+      random_seed: determinism?.random_seed ?? null,
+      warnings: result.proofBundle.metadata?.warnings ?? [],
+      preview: result.proofBundle,
+      legacyPreview: result.legacyProofBundle,
     })
   } catch (error) {
     console.error("Preview error:", error)
