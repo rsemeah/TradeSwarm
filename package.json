@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "node scripts/governance-lint.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "replay:fixtures": "node scripts/replay-fixtures.mjs",
+    "check:cp2": "node scripts/check-cp2.mjs"
   },
   "dependencies": {
     "next": "^16.1.6",
