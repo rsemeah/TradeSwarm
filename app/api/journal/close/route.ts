@@ -16,7 +16,7 @@ export async function POST(req: Request) {
 
     const { data: trade, error: fetchError } = await supabase
       .from("trades_v2")
-      .select("id, outcome, credit_received")
+      .select("id, outcome, credit_received, max_risk, engine_score_at_entry, regime_at_entry, strategy_type")
       .eq("id", trade_id)
       .eq("user_id", user.id)
       .single()
@@ -30,9 +30,10 @@ export async function POST(req: Request) {
     }
 
     const credit = Number(trade.credit_received ?? 0)
-    // Assumption: realized PnL is net credit retained after paying exit price.
+    // Realized PnL is net credit retained after paying exit price.
     const realizedPnl = Number((credit - exit_price).toFixed(2))
     const outcome = realizedPnl > 0 ? "win" : realizedPnl < 0 ? "loss" : "breakeven"
+    const realizedOutcome = realizedPnl > 0 ? 1 : 0
 
     const { data, error: updateError } = await supabase
       .from("trades_v2")
@@ -48,6 +49,29 @@ export async function POST(req: Request) {
 
     if (updateError) {
       return Response.json({ error: updateError.message }, { status: 400 })
+    }
+
+    // CP3: immediately write a calibration dataset row on close so the report
+    // reflects this outcome without waiting for the nightly outcome-tracker job.
+    const engineScore = Number(trade.engine_score_at_entry ?? 0)
+    const predictedProbability = Math.max(0, Math.min(1, engineScore / 100))
+
+    if (predictedProbability > 0) {
+      const lower = Math.floor(predictedProbability * 10) * 10
+      const upper = Math.min(lower + 10, 100)
+      const confidenceBucket = `${lower}-${upper}%`
+
+      await supabase.from("model_calibration_datasets").insert({
+        trade_id,
+        user_id: user.id,
+        horizon_days: 0,
+        predicted_probability: predictedProbability,
+        realized_outcome: realizedOutcome,
+        regime: String(trade.regime_at_entry ?? "unknown"),
+        risk_grade: "B",
+        model_combination: "trades_v2",
+        confidence_bucket: confidenceBucket,
+      })
     }
 
     return Response.json({ trade: data })
