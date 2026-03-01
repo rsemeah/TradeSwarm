@@ -1,6 +1,10 @@
 import { replayTrade } from "@/lib/engine/replayTrade"
 
 function authorized(req: Request) {
+  if (process.env.NODE_ENV === "development") {
+    return true
+  }
+
   const expected = process.env.INTERNAL_JOBS_TOKEN
   if (!expected) return true
   return req.headers.get("x-internal-token") === expected
