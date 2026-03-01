@@ -5,6 +5,24 @@ import { hashDeterministic } from "@/lib/engine/determinism"
 import type { ProofBundle } from "@/lib/types/proof"
 import type { CanonicalProofBundle, ModelRound, SafetyDecision } from "@/lib/types/proof-bundle"
 
+const VOLATILE_KEYS = new Set(["as_of", "latency_ms", "cacheHit", "fetchedAt", "fetched_at", "ts", "timestamp"])
+
+function stripVolatile<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((item) => stripVolatile(item)) as T
+  }
+
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !VOLATILE_KEYS.has(key))
+      .map(([key, nested]) => [key, stripVolatile(nested)])
+
+    return Object.fromEntries(entries) as T
+  }
+
+  return value
+}
+
 export type CanonicalMode = "preview" | "simulate" | "execute"
 
 interface CanonicalTradeInput {
@@ -105,12 +123,9 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
   }
 
   const normalizedMarketSnapshot = {
-    quote: bundle.marketContext.quote,
-    chain: bundle.marketContext.chain,
-    provider_health: bundle.marketContext.providerHealth,
-    as_of: bundle.marketContext.ts,
+    quote: stripVolatile(bundle.marketContext.quote),
+    chain: stripVolatile(bundle.marketContext.chain),
     source: "orchestrator.marketContext",
-    latency_ms: undefined,
   }
 
   const marketSnapshotHash = hashDeterministic(normalizedMarketSnapshot)
@@ -267,8 +282,8 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
 async function enforceReplayPolicy(mode: CanonicalMode, engineVersion: string): Promise<void> {
   if (mode !== "execute") return
 
-  const coverageThreshold = Number(process.env.REPLAY_COVERAGE_THRESHOLD ?? 0)
-  const mismatchThreshold = Number(process.env.REPLAY_MISMATCH_THRESHOLD ?? 1)
+  const coverageThreshold = Number(process.env.REPLAY_COVERAGE_THRESHOLD ?? 0.5)
+  const mismatchThreshold = Number(process.env.REPLAY_MISMATCH_THRESHOLD ?? 0)
   if (coverageThreshold <= 0 && mismatchThreshold >= 1) return
 
   const supabase = await createClient()
