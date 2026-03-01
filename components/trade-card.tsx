@@ -6,6 +6,8 @@ import { getTrustScoreColor } from "@/lib/utils"
 import { useTrade } from "@/lib/trade-context"
 import { SniperOverlay } from "./sniper-overlay"
 import { LearnWhyModal } from "./learn-why-modal"
+import { ReceiptDrawer, type ReceiptData } from "./receipt-drawer"
+import type { ProofBundle } from "@/lib/types/proof"
 
 interface TradeCardProps {
   candidate: TradeCandidate
@@ -161,12 +163,113 @@ function AuditPanel({ candidate, view }: { candidate: TradeCandidate; view: "sim
   )
 }
 
+
+function mapTradeToReceiptData(trade: TradeCandidate): ReceiptData {
+  const proofBundle: ProofBundle = {
+    requestId: `trade-${trade.ticker}-${Date.now()}`,
+    action: "preview",
+    ticker: trade.ticker,
+    engineVersion: "unknown",
+    marketContext: {
+      requestId: `trade-${trade.ticker}`,
+      ticker: trade.ticker,
+      action: "preview",
+      quote: null,
+      chain: null,
+      providerHealth: {
+        status: "ok",
+        latencyMs: 0,
+        cached: false,
+        fetchedAt: new Date().toISOString(),
+      },
+      ts: new Date().toISOString(),
+    },
+    regime: {
+      name: "unknown",
+      trend: "neutral",
+      volatility: "medium",
+      momentum: "neutral",
+      score: trade.auditAdvanced.regimeScore,
+      inputs: { sma20: 0, sma50: 0, rsi14: 0, atr14: 0, priceChange5d: 0, volumeRatio: 0 },
+      confidence: trade.auditAdvanced.regimeScore,
+      ts: new Date().toISOString(),
+    },
+    risk: {
+      simCount: 0,
+      monteCarloSeed: 42,
+      medianPL: 0,
+      pct10: 0,
+      pct90: 0,
+      maxDrawdown: 0,
+      expectedReturn: 0,
+      sharpeRatio: 0,
+      kellyFraction: 0,
+      positionSizeRecommended: trade.amountDollars ?? 0,
+      riskLevel: "medium",
+      ts: new Date().toISOString(),
+    },
+    deliberation: [],
+    scoring: {
+      trustScore: trade.trustScore,
+      rawAvgScore: trade.trustScore,
+      agreementRatio: 1,
+      penaltyFactor: 0,
+      factors: {
+        modelAgreement: 1,
+        providerCredibility: 1,
+        regimeAlignmentBonus: trade.auditAdvanced.regimeScore,
+        riskPenalty: 0,
+      },
+      weights: {
+        modelAgreement: 1,
+        providerCredibility: 1,
+        regimeAlignmentBonus: 1,
+        riskPenalty: 1,
+      },
+      ts: new Date().toISOString(),
+    },
+    preflight: {
+      pass: trade.status !== "NO",
+      reason: trade.status === "NO" ? "Trade blocked by safety gate" : "All gates passed",
+      gates: trade.auditAdvanced.gates.map((gate) => ({
+        name: gate.name,
+        passed: gate.passed,
+        reason: gate.passed ? "passed" : "failed",
+      })),
+    },
+    finalDecision: {
+      action: trade.status,
+      reason: trade.bullets.why,
+      trustScore: trade.trustScore,
+      recommendedAmount: trade.amountDollars,
+      bullets: trade.bullets,
+    },
+    engineDegraded: trade.status === "NO",
+    warnings: [],
+    events: [],
+    ts: new Date().toISOString(),
+  }
+
+  return {
+    proofBundle,
+    executedAt: new Date(),
+    isSimulation: false,
+    scoring: trade.scoring,
+    determinism: {
+      determinismHash: "pending",
+      marketSnapshotHash: "pending",
+      randomSeed: 42,
+    },
+  }
+}
+
 export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
-  const [showAudit, setShowAudit] = useState(false)
+  const [showAudit] = useState(false)
   const [auditView, setAuditView] = useState<"simple" | "advanced">("simple")
   const [showSniper, setShowSniper] = useState<"execute" | "simulate" | null>(null)
   const [showLearnWhy, setShowLearnWhy] = useState(false)
   const [showReasoning, setShowReasoning] = useState(false)
+  const [receiptOpen, setReceiptOpen] = useState(false)
   const { state, executeTrade, simulateTrade } = useTrade()
 
   const isGo = candidate.status === "GO"
@@ -207,7 +310,13 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
         onClose={() => setShowLearnWhy(false)}
         candidate={candidate}
       />
-      
+
+      <ReceiptDrawer
+        isOpen={receiptOpen}
+        onClose={() => setReceiptOpen(false)}
+        receipt={mapTradeToReceiptData(candidate)}
+      />
+
       <div className="rounded-[10px] border border-border bg-card p-4">
         <StatusBadge status={candidate.status} />
 
@@ -290,10 +399,10 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
       <div className="flex flex-wrap items-center gap-3">
         {!isNo && (
           <button
-            onClick={() => setShowAudit(!showAudit)}
+            onClick={() => setReceiptOpen(true)}
             className="text-[11px] text-muted-foreground transition-colors hover:text-foreground"
           >
-            {showAudit ? "✕ Close receipt" : "See receipt ›"}
+            See receipt ›
           </button>
         )}
         <button
