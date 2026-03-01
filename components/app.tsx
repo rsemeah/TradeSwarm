@@ -79,7 +79,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="min-h-screen p-4">
+      <main className="hidden lg:block min-h-screen p-4">
         {/* Top Navigation Bar */}
         <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-card/70 px-4 py-3">
           <div className="flex items-center gap-4">
