@@ -84,6 +84,7 @@ export async function POST(req: Request) {
       receiptId: result.receiptId,
       proofBundle: result.proofBundle,
       legacyProofBundle: result.legacyProofBundle,
+      measurements: result.measurements,
     })
   } catch (error) {
     console.error("Execute error:", error)

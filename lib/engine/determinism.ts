@@ -1,21 +1,10 @@
-import { createHash } from "node:crypto"
+import { sha256CanonicalJson } from "@/src/lib/determinism/hash"
+import { stableJsonStringify } from "@/src/lib/determinism/stableJson"
 
 export function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value)
-  }
-
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(",")}]`
-  }
-
-  const entries = Object.entries(value as Record<string, unknown>)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([k, v]) => `${JSON.stringify(k)}:${stableStringify(v)}`)
-
-  return `{${entries.join(",")}}`
+  return stableJsonStringify(value)
 }
 
 export function hashDeterministic(value: unknown): string {
-  return createHash("sha256").update(stableStringify(value)).digest("hex")
+  return sha256CanonicalJson(value)
 }

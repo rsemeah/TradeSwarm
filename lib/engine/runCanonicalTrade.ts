@@ -2,8 +2,11 @@ import { createClient } from "@/lib/supabase/server"
 import { evaluateSafety } from "@/lib/engine/safety"
 import { runTradeSwarm } from "@/lib/engine/orchestrator"
 import { hashDeterministic } from "@/lib/engine/determinism"
+import { persistEdgeRejection } from "@/lib/engine/measurement"
 import type { ProofBundle } from "@/lib/types/proof"
 import type { CanonicalProofBundle, ModelRound, SafetyDecision } from "@/lib/types/proof-bundle"
+import { computeInputHash, computeOutputHash } from "@/src/lib/determinism/hash"
+import { ENGINE_INPUT_VERSION, type EngineInputV1 } from "@/src/types/EngineInput.v1"
 
 export type CanonicalMode = "preview" | "simulate" | "execute"
 
@@ -24,6 +27,17 @@ interface CanonicalTradeResult {
   receiptId: string | null
   tradeId: string | null
   blocked: boolean
+  measurements: {
+    schema_version: string
+    engine_version: string
+    config_hash: string
+    input_hash: string
+    output_hash: string
+    market_snapshot_hash: string
+    random_seed: string | null
+    mode: CanonicalMode
+    persistence?: "supabase" | "file_fallback"
+  }
 }
 
 interface PersistedMarketSnapshot {
@@ -149,6 +163,7 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
       safety_status: safetyDecision.safety_status,
       reason_code: safetyDecision.reason_code,
       determinism: {
+        schema_version: ENGINE_INPUT_VERSION,
         market_snapshot_ref: null,
         market_snapshot_hash: marketSnapshotHash,
         engine_version: bundle.engineVersion,
@@ -157,6 +172,39 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
         random_seed: randomSeed,
         monte_carlo_seed: randomSeed,
       },
+    },
+  }
+}
+
+function buildEngineInputV1(input: CanonicalTradeInput, bundle: ProofBundle, canonicalBundle: CanonicalProofBundle): EngineInputV1 {
+  return {
+    schema_version: ENGINE_INPUT_VERSION,
+    run: {
+      run_id: canonicalBundle.metadata?.request_id ?? crypto.randomUUID(),
+      mode: input.mode,
+      engine_version: canonicalBundle.metadata?.engine_version ?? bundle.engineVersion,
+      config_hash: canonicalBundle.metadata?.determinism?.config_hash ?? "unknown",
+      created_utc: canonicalBundle.timestamp,
+    },
+    request: {
+      ticker: input.ticker,
+      amount_usd: input.amount,
+      intent: input.mode,
+    },
+    snapshot: {
+      market_snapshot_hash: canonicalBundle.metadata?.determinism?.market_snapshot_hash ?? hashDeterministic(canonicalBundle.market_snapshot),
+      market_snapshot: canonicalBundle.market_snapshot,
+    },
+    features: {
+      trust_score: canonicalBundle.trust_score,
+      consensus_score: canonicalBundle.consensus_score,
+      regime_snapshot: canonicalBundle.regime_snapshot,
+      risk_snapshot: canonicalBundle.risk_snapshot,
+      preflight_pass: bundle.preflight.pass,
+      final_action: bundle.finalDecision.action,
+    },
+    stochastic: {
+      random_seed: canonicalBundle.metadata?.determinism?.random_seed != null ? String(canonicalBundle.metadata.determinism.random_seed) : null,
     },
   }
 }
@@ -194,7 +242,9 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
     canonicalBundle.metadata.determinism.market_snapshot_ref = persistedSnapshot.snapshotId
     canonicalBundle.metadata.determinism.market_snapshot_hash = persistedSnapshot.contentHash
     canonicalBundle.metadata.determinism.determinism_hash = hashDeterministic({
-      input_snapshot: canonicalBundle.input_snapshot,
+      schema_version: canonicalBundle.metadata.determinism.schema_version,
+      input_hash: canonicalBundle.metadata.determinism.input_hash,
+      output_hash: canonicalBundle.metadata.determinism.output_hash,
       market_snapshot_hash: persistedSnapshot.contentHash,
       engine_version: canonicalBundle.metadata.determinism.engine_version,
       config_hash: canonicalBundle.metadata.determinism.config_hash,
@@ -310,8 +360,44 @@ export async function runCanonicalTrade(input: CanonicalTradeInput): Promise<Can
   })
 
   const canonicalProofBundle = buildCanonicalProofBundle(base.proofBundle, input)
+  const engineInput = buildEngineInputV1(input, base.proofBundle, canonicalProofBundle)
+  const inputHash = computeInputHash(engineInput)
+  const outputHash = computeOutputHash(canonicalProofBundle.safety_decision)
+  const determinismHash = hashDeterministic({
+    input_hash: inputHash,
+    output_hash: outputHash,
+    market_snapshot_hash: engineInput.snapshot.market_snapshot_hash,
+    engine_version: engineInput.run.engine_version,
+    config_hash: engineInput.run.config_hash,
+    random_seed: engineInput.stochastic.random_seed,
+  })
+
+  if (canonicalProofBundle.metadata?.determinism) {
+    canonicalProofBundle.metadata.determinism.schema_version = ENGINE_INPUT_VERSION
+    canonicalProofBundle.metadata.determinism.input_hash = inputHash
+    canonicalProofBundle.metadata.determinism.output_hash = outputHash
+    canonicalProofBundle.metadata.determinism.determinism_hash = determinismHash
+  }
+
   await enforceReplayPolicy(input.mode, canonicalProofBundle.metadata?.engine_version ?? "unknown")
   const blocked = canonicalProofBundle.safety_decision.safety_status === "BLOCKED"
+
+  let rejectionPersistence: "supabase" | "file_fallback" | undefined
+  if (blocked) {
+    rejectionPersistence = await persistEdgeRejection({
+      trade_id: null,
+      schema_version: ENGINE_INPUT_VERSION,
+      engine_version: engineInput.run.engine_version,
+      input_hash: inputHash,
+      market_snapshot_hash: engineInput.snapshot.market_snapshot_hash,
+      rejection_reason: canonicalProofBundle.safety_decision.reason_code ?? "UNKNOWN_REJECTION",
+      threshold_used: {
+        safety_mode: input.safetyMode,
+        max_size_hint: canonicalProofBundle.safety_decision.max_size_hint,
+      },
+      trade_candidate: engineInput as unknown as Record<string, unknown>,
+    })
+  }
 
   const shouldPersist = input.mode === "preview" || input.mode === "simulate" || (input.mode === "execute" && !blocked)
   const persisted = shouldPersist
@@ -324,5 +410,16 @@ export async function runCanonicalTrade(input: CanonicalTradeInput): Promise<Can
     receiptId: persisted.receiptId,
     tradeId: persisted.tradeId,
     blocked,
+    measurements: {
+      schema_version: ENGINE_INPUT_VERSION,
+      engine_version: engineInput.run.engine_version,
+      config_hash: engineInput.run.config_hash,
+      input_hash: inputHash,
+      output_hash: outputHash,
+      market_snapshot_hash: engineInput.snapshot.market_snapshot_hash,
+      random_seed: engineInput.stochastic.random_seed ?? null,
+      mode: input.mode,
+      persistence: rejectionPersistence,
+    },
   }
 }

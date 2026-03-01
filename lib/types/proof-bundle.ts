@@ -194,11 +194,14 @@ export interface SafetyDecision {
 }
 
 export interface DeterminismContext {
+  schema_version?: string
   market_snapshot_ref: string | null
   market_snapshot_hash: string
   engine_version: string
   config_hash: string
   determinism_hash: string
+  input_hash?: string
+  output_hash?: string
   random_seed: number | null
   monte_carlo_seed?: number | null
 }
