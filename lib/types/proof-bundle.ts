@@ -231,6 +231,14 @@ export interface CanonicalProofBundle {
     source?: string
     latency_ms?: number
   }
+  capital?: {
+    kelly_fraction: number
+    confidence_tier: Tier | string
+    throttle_multiplier: number
+    recommended_size: number
+    hard_capped: boolean
+  }
+  market_snapshot_hash?: string
   metadata?: {
     request_id?: string
     engine_version?: string
