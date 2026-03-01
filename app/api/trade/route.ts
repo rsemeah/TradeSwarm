@@ -46,6 +46,7 @@ export async function POST(req: Request) {
       proofBundle: result.proofBundle,
       legacyProofBundle: result.legacyProofBundle,
       reasonCode: result.proofBundle.safety_decision.reason_code,
+      measurements: result.measurements,
     })
   } catch (error) {
     console.error("Trade error:", error)

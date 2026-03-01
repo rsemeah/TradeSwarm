@@ -45,6 +45,7 @@ export async function POST(req: Request) {
       proofBundle: result.proofBundle,
       legacyProofBundle: result.legacyProofBundle,
       isSimulation: true,
+      measurements: result.measurements,
     })
   } catch (error) {
     console.error("Simulate error:", error)
