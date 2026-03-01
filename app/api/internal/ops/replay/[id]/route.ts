@@ -1,7 +1,8 @@
+import { isLocalDevBypassEnabled } from "@/lib/env/devBypass"
 import { replayTrade } from "@/lib/engine/replayTrade"
 
 function authorized(req: Request) {
-  if (process.env.NODE_ENV === "development") {
+  if (isLocalDevBypassEnabled()) {
     return true
   }
 
@@ -18,7 +19,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
     const { id } = await ctx.params
     const report = await replayTrade(id)
-    return Response.json({ success: true, report })
+    return Response.json({ success: true, ...report, report })
   } catch (error) {
     console.error("Replay trade failed", error)
     return Response.json({ error: String(error) }, { status: 500 })

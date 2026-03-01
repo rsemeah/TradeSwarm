@@ -1,5 +1,6 @@
-import { createClient } from "@/lib/supabase/server"
 import { runCanonicalTrade } from "@/lib/engine/runCanonicalTrade"
+import { isLocalDevBypassEnabled } from "@/lib/env/devBypass"
+import { createClient } from "@/lib/supabase/server"
 
 export async function POST(req: Request) {
   const correlationId = crypto.randomUUID()
@@ -9,7 +10,7 @@ export async function POST(req: Request) {
 
     let userId: string
 
-    if (process.env.NODE_ENV === "development") {
+    if (isLocalDevBypassEnabled()) {
       userId = "dev-user"
     } else {
       const {
@@ -48,13 +49,21 @@ export async function POST(req: Request) {
       userContext: marketContext,
     })
 
+    const determinism = result.proofBundle.metadata?.determinism
+
     return Response.json({
       success: true,
       correlationId,
-      preview: result.proofBundle,
-      legacyPreview: result.legacyProofBundle,
+      tradeId: result.tradeId,
+      trade_id: result.tradeId,
       receiptId: result.receiptId,
       blocked: result.blocked,
+      determinism_hash: determinism?.determinism_hash ?? null,
+      market_snapshot_hash: determinism?.market_snapshot_hash ?? null,
+      random_seed: determinism?.random_seed ?? null,
+      warnings: result.proofBundle.metadata?.warnings ?? [],
+      preview: result.proofBundle,
+      legacyPreview: result.legacyProofBundle,
     })
   } catch (error) {
     console.error("Preview error:", error)
