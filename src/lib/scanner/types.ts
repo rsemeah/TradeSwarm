@@ -65,3 +65,16 @@ export interface RankedDeal {
   tier: Tier
   rank: number
 }
+
+export interface ScanResult {
+  scan_id: string
+  scanned_at: string
+  config: ScanConfig
+  regime: Regime
+  deals: RankedDeal[]
+  filter_counts: FilterCounts
+  universe_size: number
+  candidates_generated: number
+  candidates_passed: number
+  cache_hit: boolean
+}
