@@ -77,4 +77,7 @@ export interface ScanResult {
   candidates_generated: number
   candidates_passed: number
   cache_hit: boolean
+  // Empty state fields (for when scan finds no candidates)
+  empty?: boolean
+  reason?: string
 }
