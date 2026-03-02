@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import type { ProofBundle } from "@/lib/types/proof"
 import type { TradeScoringDetail } from "@/lib/types"
 
@@ -18,48 +19,15 @@ export interface ReceiptData {
   }[]
 }
 
-// Locked contract props (baseline composition surface)
-interface BaseReceiptDrawerProps {
+interface ReceiptDrawerProps {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   children?: React.ReactNode
-}
-
-// Extended props (current implementation)
-interface ExtendedReceiptDrawerProps {
   isOpen?: boolean
   onClose?: () => void
   receipt?: ReceiptData | null
 }
 
-type ReceiptDrawerProps = BaseReceiptDrawerProps & ExtendedReceiptDrawerProps
-
-type TabId = "summary" | "regime" | "risk" | "deliberation" | "scoring"
-function verdictColor(v: string) {
-  if (v === "GO") return "text-emerald-400"
-  if (v === "WAIT") return "text-amber-300"
-  return "text-rose-400"
-}
-
-export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) {
-  if (!isOpen || !receipt) return null
-
-  const { proofBundle, executedAt } = receipt
-  const finalDecision = proofBundle.finalDecision
-
-  return (
-    <div className="fixed inset-0 z-50">
-      <button aria-label="Close receipt drawer" className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-slate-950 p-4 text-slate-100">
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">Trade Receipt</p>
-            <h2 className="text-2xl font-semibold">{proofBundle.ticker}</h2>
-            <p className="text-xs text-slate-400">
-              {proofBundle.action} · {executedAt.toISOString()} · v{proofBundle.engineVersion}
-            </p>
-          </div>
-          <button className="rounded border border-slate-700 px-2 py-1 text-xs" onClick={onClose}>
 type TabId = "summary" | "regime" | "risk" | "deliberation" | "scoring"
 
 function verdictColor(v: string) {
@@ -98,17 +66,16 @@ export function ReceiptDrawer({
   onClose,
   receipt,
 }: ReceiptDrawerProps) {
-export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabId>("summary")
+  const [expandedRound, setExpandedRound] = useState<number | null>(null)
 
-  // Support both prop signatures
   const isVisible = open ?? isOpen ?? false
   const handleClose = () => {
     if (onOpenChange) onOpenChange(false)
     if (onClose) onClose()
   }
 
-  // If using composition pattern (children), render shell only
+  // Composition pattern (children)
   if (children !== undefined) {
     if (!isVisible) return null
     return (
@@ -128,86 +95,54 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
     )
   }
 
-  // Legacy implementation with receipt data
+  // Standard receipt view
   if (!isVisible || !receipt) return null
 
   const { proofBundle: pb, executedAt } = receipt
+  const fd = pb.finalDecision
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "summary", label: "Summary" },
     { id: "regime", label: "Regime" },
     { id: "risk", label: "Risk" },
-    { id: "deliberation", label: "AI Rounds" },
+    { id: "deliberation", label: "AI" },
     { id: "scoring", label: "Score" },
   ]
 
-  function handleExport() {
-    const blob = new Blob([JSON.stringify(pb, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `tradeswarm-proof-${pb.ticker}-${pb.requestId.slice(0, 8)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
   return (
     <div className="fixed inset-0 z-50">
-      {/* Backdrop */}
-      <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
-
-      {/* Drawer */}
-      <div
-        className="absolute bottom-0 left-0 right-0 z-50 max-h-[90vh] overflow-hidden rounded-t-2xl bg-card"
-        style={{ animation: "slideUp 0.3s ease-out" }}
-      >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
+      <div className="absolute bottom-0 left-0 right-0 max-h-[90vh] overflow-hidden rounded-t-2xl bg-card">
         {/* Handle */}
-      <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="absolute bottom-0 left-0 right-0 z-50 max-h-[90vh] overflow-hidden rounded-t-2xl bg-card">
         <div className="flex justify-center py-3">
           <div className="h-1 w-10 rounded-full bg-border" />
         </div>
 
+        {/* Header */}
         <div className="border-b border-border px-4 pb-3">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${
-                    pb.action === "simulate"
-                      ? "bg-warning/20 text-warning"
-                      : pb.action === "preview"
-                        ? "bg-muted text-muted-foreground"
-                        : "bg-accent/20 text-accent"
-                  }`}
-                >
-                  {pb.action}
-                </span>
-                <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${verdictColor(fd.action)}`}>
+                <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${verdictColor(fd.action)}`}>
                   {fd.action}
-                <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${verdictColor(pb.finalDecision.action)}`}>
-                  {pb.finalDecision.action}
                 </span>
-                {pb.engineDegraded && (
-                  <span className="rounded bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning">degraded</span>
-                )}
               </div>
               <h2 className="mt-1.5 font-mono text-2xl font-bold text-foreground">{pb.ticker}</h2>
               <p className="text-[10px] text-muted-foreground">
-                {executedAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} ET &nbsp;·&nbsp;v
-                {pb.engineVersion}
                 {executedAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} ET · v{pb.engineVersion}
               </p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="font-mono text-xl font-bold text-accent">${pb.finalDecision.recommendedAmount?.toLocaleString() ?? "—"}</p>
+              <p className="font-mono text-xl font-bold text-accent">
+                ${fd.recommendedAmount?.toLocaleString() ?? "—"}
+              </p>
               <p className="text-[10px] text-muted-foreground">recommended</p>
             </div>
           </div>
         </div>
 
+        {/* Tabs */}
         <div className="flex overflow-x-auto border-b border-border">
-          {tabs.map(({ id, label }) => (
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -216,90 +151,30 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
                 activeTab === tab.id ? "border-b-2 border-accent text-foreground" : "text-muted-foreground"
               }`}
             >
-              {label}
               {tab.label}
             </button>
           ))}
         </div>
 
         {/* Content */}
-        <div className="max-h-[52vh] overflow-y-auto p-4 space-y-3">
-          {/* SUMMARY TAB */}
-          {activeTab === "summary" && (
-            <>
-              <div className="rounded-lg border border-border bg-background p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Trust Score</span>
-                  <span className="font-mono text-lg font-bold text-foreground">{fd.trustScore}/100</span>
-                </div>
-                <ScoreBar value={fd.trustScore} />
-              </div>
-
-              <div
-                className={`rounded-lg border p-3 ${
-                  pb.preflight.pass ? "border-accent/30 bg-accent/5" : "border-danger/30 bg-danger/5"
-                }`}
-              >
-                <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">Preflight</p>
-                <p className="text-xs text-foreground">{pb.preflight.reason}</p>
-                <div className="mt-2 space-y-1">
-                  {pb.preflight.gates.map((g, i) => (
-                    <div key={i} className="flex items-center gap-2 text-[10px]">
-                      <span className={g.passed ? "text-accent" : "text-danger"}>{g.passed ? "✓" : "✗"}</span>
-                      <span className="text-muted-foreground">{g.name}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {fd.bullets && (
-                <>
-                  <div className="rounded-lg border border-border bg-background p-3">
-                    <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">Why This Trade</p>
-                    <p className="text-xs leading-relaxed text-foreground">{fd.bullets.why}</p>
-                  </div>
-                  <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
-                    <p className="mb-1 text-[10px] font-bold text-warning">Risk Note</p>
-                    <p className="text-xs leading-relaxed text-foreground">{fd.bullets.risk}</p>
-                  </div>
-                  <div className="rounded-lg border border-border bg-background p-3">
-                    <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">Position</p>
-                    <p className="text-xs leading-relaxed text-foreground">{fd.bullets.amount}</p>
-                  </div>
-                </>
-              )}
-
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Engine Events</p>
-                <div className="space-y-1">
-                  {pb.events.map((ev, i) => (
-                    <div key={i} className="flex items-center justify-between text-[10px]">
-                      <span className="font-mono text-foreground">{ev.name}</span>
-                      <div className="flex items-center gap-2">
-                        {ev.durationMs !== undefined && <span className="text-muted-foreground">{ev.durationMs}ms</span>}
-                        <span className={statusColor(ev.status)}>{ev.status}</span>
-                      </div>
-                    </div>
-                  ))}
         <div className="max-h-[52vh] space-y-3 overflow-y-auto p-4 text-xs">
           {activeTab === "summary" && (
             <>
               <div className="rounded-lg border border-border bg-background p-3">
                 <p className="text-muted-foreground">Reason</p>
-                <p className="mt-1 text-foreground">{pb.finalDecision.reason}</p>
+                <p className="mt-1 text-foreground">{fd.reason}</p>
               </div>
               <div className="rounded-lg border border-border bg-background p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Trust Score</span>
-                  <span className="font-mono font-bold text-foreground">{pb.finalDecision.trustScore}/100</span>
+                  <span className="font-mono font-bold text-foreground">{fd.trustScore}/100</span>
                 </div>
-                <ScoreBar value={pb.finalDecision.trustScore} />
+                <ScoreBar value={fd.trustScore} />
               </div>
             </>
           )}
 
-          {/* REGIME TAB */}
-          {activeTab === "regime" && (
+          {activeTab === "regime" && pb.regime && (
             <>
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -313,70 +188,39 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
                   </div>
                 ))}
               </div>
-
               <div className="rounded-lg border border-border bg-background p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Regime Confidence</span>
-                  <span className="font-mono text-sm font-bold text-foreground">
+                  <span className="text-muted-foreground">Confidence</span>
+                  <span className="font-mono font-bold text-foreground">
                     {(pb.regime.confidence * 100).toFixed(0)}%
                   </span>
                 </div>
                 <ScoreBar value={pb.regime.confidence * 100} />
               </div>
-
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Signals</p>
-                <div className="space-y-1.5">
-                  <FactorRow label="SMA20" value={pb.regime.inputs.sma20} />
-                  <FactorRow label="SMA50" value={pb.regime.inputs.sma50} />
-                  <FactorRow label="RSI14" value={pb.regime.inputs.rsi14} />
-                  <FactorRow label="ATR14" value={pb.regime.inputs.atr14} />
-                  <FactorRow label="5d Change %" value={pb.regime.inputs.priceChange5d} signed />
-                  <FactorRow label="Volume Ratio" value={pb.regime.inputs.volumeRatio} />
-                </div>
-              </div>
             </>
           )}
 
-          {/* RISK TAB */}
-          {activeTab === "risk" && (
+          {activeTab === "risk" && pb.risk && (
             <>
               <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Risk Simulation</p>
+                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Risk Metrics</p>
                 <div className="space-y-1.5">
                   <FactorRow label="Avg Return" value={pb.risk.avgReturn * 100} signed />
                   <FactorRow label="Max Drawdown" value={pb.risk.maxDrawdown * 100} signed />
                   <FactorRow label="Sharpe Ratio" value={pb.risk.sharpe} />
                   <FactorRow label="Win Rate" value={pb.risk.winRate * 100} />
-                  <FactorRow label="Profit Factor" value={pb.risk.profitFactor} />
                 </div>
               </div>
-
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">VaR Analysis</p>
-                <div className="space-y-1.5">
-                  <FactorRow label="VaR 95%" value={pb.risk.var95 * 100} signed />
-                  <FactorRow label="VaR 99%" value={pb.risk.var99 * 100} signed />
-                </div>
-              </div>
-
-              {pb.risk.regimeAdjustment && (
-                <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
-                  <p className="mb-1 text-[10px] font-bold text-accent">Regime Adjustment</p>
-                  <p className="text-xs text-foreground">{pb.risk.regimeAdjustment}</p>
-                </div>
-              )}
             </>
           )}
 
-          {/* DELIBERATION TAB */}
-          {activeTab === "deliberation" && (
+          {activeTab === "deliberation" && pb.modelRounds && (
             <>
               {pb.modelRounds.map((round, i) => (
-                <div key={i} className="rounded-lg border border-border bg-background overflow-hidden">
+                <div key={i} className="overflow-hidden rounded-lg border border-border bg-background">
                   <button
                     onClick={() => setExpandedRound(expandedRound === i ? null : i)}
-                    className="w-full flex items-center justify-between p-3 text-left"
+                    className="flex w-full items-center justify-between p-3 text-left"
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-medium text-foreground">{round.model}</span>
@@ -384,22 +228,11 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
                         {round.decision}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground">{round.confidence}%</span>
-                      <svg
-                        className={`h-4 w-4 text-muted-foreground transition-transform ${expandedRound === i ? "rotate-180" : ""}`}
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
+                    <span className="text-[10px] text-muted-foreground">{round.confidence}%</span>
                   </button>
                   {expandedRound === i && (
                     <div className="border-t border-border p-3">
                       <p className="text-xs leading-relaxed text-foreground">{round.reasoning}</p>
-                      <p className="mt-2 text-[9px] text-muted-foreground">{round.durationMs}ms</p>
                     </div>
                   )}
                 </div>
@@ -407,118 +240,40 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
             </>
           )}
 
-          {/* SCORING TAB */}
           {activeTab === "scoring" && (
             <>
               <div className="rounded-lg border border-border bg-background p-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Final Trust Score</span>
+                  <span className="text-muted-foreground">Final Trust Score</span>
                   <span className="font-mono text-lg font-bold text-foreground">{fd.trustScore}/100</span>
                 </div>
                 <ScoreBar value={fd.trustScore} />
               </div>
-
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Score Factors</p>
-                <div className="space-y-1.5">
-                  {pb.scoring.factors.map((f, i) => (
-                    <div key={i} className="flex items-center justify-between text-[10px]">
-                      <span className="text-muted-foreground">{f.name}</span>
-                      <span className={`font-mono ${f.impact >= 0 ? "text-accent" : "text-danger"}`}>
-                        {f.impact >= 0 ? "+" : ""}
-                        {f.impact}
-                      </span>
-                    </div>
-                  ))}
+              {pb.scoring?.factors && (
+                <div className="rounded-lg border border-border bg-background p-3">
+                  <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Score Factors</p>
+                  <div className="space-y-1.5">
+                    {pb.scoring.factors.map((f, i) => (
+                      <div key={i} className="flex items-center justify-between text-[10px]">
+                        <span className="text-muted-foreground">{f.name}</span>
+                        <span className={`font-mono ${f.impact >= 0 ? "text-accent" : "text-danger"}`}>
+                          {f.impact >= 0 ? "+" : ""}{f.impact}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">Scoring Policy</p>
-                <p className="text-xs text-foreground">{pb.scoring.formula.policy}</p>
-              </div>
+              )}
             </>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border p-4 flex items-center justify-between">
-          <button onClick={handleExport} className="text-[10px] text-muted-foreground hover:text-foreground">
-            Export JSON
-          {activeTab === "regime" && (
-            <div className="rounded-lg border border-border bg-background p-3">
-              <p>Trend: {pb.regime.trend}</p>
-              <p>Volatility: {pb.regime.volatility}</p>
-              <p>Momentum: {pb.regime.momentum}</p>
-              <p>Confidence: {(pb.regime.confidence * 100).toFixed(0)}%</p>
-            </div>
-          )}
-
-          {activeTab === "risk" && (
-            <div className="rounded-lg border border-border bg-background p-3">
-              <p>Risk level: {pb.risk.riskLevel}</p>
-              <p>Kelly fraction: {pb.risk.kellyFraction.toFixed(3)}</p>
-              <p>Position size: ${pb.risk.positionSizeRecommended.toFixed(2)}</p>
-              <p>Max drawdown: {(pb.risk.maxDrawdown * 100).toFixed(2)}%</p>
-            </div>
-          )}
-
-          {activeTab === "deliberation" && (
-            <div className="space-y-2">
-              {pb.deliberation.map((round) => (
-                <div key={round.roundId} className="rounded-lg border border-border bg-background p-3">
-                  <p className="font-semibold">{round.stage}</p>
-                  <p className="text-muted-foreground">{round.outcome.reason}</p>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {activeTab === "scoring" && (
-            <div className="rounded-lg border border-border bg-background p-3">
-              <p>Raw Avg: {pb.scoring.rawAvgScore.toFixed(2)}</p>
-              <p>Agreement: {(pb.scoring.agreementRatio * 100).toFixed(1)}%</p>
-              <p>Penalty: {(pb.scoring.penaltyFactor * 100).toFixed(1)}%</p>
-            </div>
-          )}
-        </div>
-
-        <div className="flex gap-2 border-t border-border p-3">
-          <button onClick={handleExport} className="flex-1 rounded-lg border border-border py-2.5 text-xs font-medium text-muted-foreground">
-            Export Proof
-          </button>
-          <button onClick={onClose} className="flex-1 rounded-lg bg-muted py-2.5 text-xs font-medium text-foreground">
-            Close
-          </button>
-          <p className="text-[9px] text-muted-foreground font-mono">{pb.requestId}</p>
-        </div>
-
-        <section className="mb-4 rounded border border-slate-800 p-3">
-          <p className="text-xs text-slate-400">Decision</p>
-          <p className={`text-lg font-semibold ${verdictColor(finalDecision.action)}`}>{finalDecision.action}</p>
-          <p className="text-sm text-slate-200">{finalDecision.reason}</p>
-          <p className="mt-2 text-xs text-slate-400">
-            Trust {finalDecision.trustScore} · Recommended ${finalDecision.recommendedAmount ?? 0}
+        <div className="border-t border-border p-4">
+          <p className="text-center text-[9px] text-muted-foreground">
+            Request ID: {pb.requestId}
           </p>
-        </section>
-
-        <section className="mb-4 rounded border border-slate-800 p-3">
-          <p className="mb-2 text-xs text-slate-400">Preflight gates</p>
-          <ul className="space-y-1 text-sm">
-            {proofBundle.preflight.gates.map((gate) => (
-              <li key={gate.name}>
-                <span className={gate.passed ? "text-emerald-400" : "text-rose-400"}>{gate.passed ? "✓" : "✕"}</span>{" "}
-                {gate.name} — {gate.reason}
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="rounded border border-slate-800 p-3">
-          <p className="mb-2 text-xs text-slate-400">Determinism</p>
-          <p className="text-xs text-slate-300">Request ID: {proofBundle.requestId}</p>
-          <p className="text-xs text-slate-300">Monte Carlo seed: {proofBundle.risk.monteCarloSeed}</p>
-        </section>
+        </div>
       </div>
     </div>
   )
