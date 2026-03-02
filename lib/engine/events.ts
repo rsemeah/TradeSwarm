@@ -87,19 +87,6 @@ export async function recordStageEvent(supabase: any, input: StageEventInput) {
         ...(input.details || {}),
       },
     })
-export async function recordStageEvent(supabase: { from: (table: string) => { insert: (payload: Record<string, unknown>) => PromiseLike<{ error: { message?: string } | null }> } }, input: StageEventInput) {
-  const { error } = await supabase.from("engine_events").insert({
-    user_id: input.userId ?? null,
-    event_type: input.stage,
-    ticker: input.ticker ?? null,
-    duration_ms: input.durationMs,
-    payload: {
-      status: input.status,
-      correlationId: input.correlationId,
-      reasonCode: input.reasonCode ?? null,
-      ...(input.details || {}),
-    },
-  })
 
     if (error) {
       console.error(`Failed to write engine event ${input.stage}:`, error.message || error)
