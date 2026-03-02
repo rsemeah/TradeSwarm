@@ -39,8 +39,8 @@ export default function LoginPage() {
         <div className="mb-8 flex flex-col items-center">
           <Logo variant="icon" size="xl" />
           <div className="mt-3 text-lg font-bold tracking-wide">
-            <span className="text-[#1B5E20]">TRADE</span>
-            <span className="text-[#C5A028]">SWARM</span>
+            <span className="text-[#C5A028]">TRADE</span>
+            <span className="text-[#1B5E20]">SWARM</span>
           </div>
           <p className="mt-2 text-sm text-[#6b6b6b]">Sign in to your account</p>
         </div>
