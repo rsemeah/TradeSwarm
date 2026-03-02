@@ -44,3 +44,24 @@ export interface FilterResult {
 }
 
 export type FilterCounts = Record<string, number>
+
+export interface RankedDeal {
+  candidate: RawCandidate
+  score: {
+    total: number
+    display: string
+    breakdown: Record<string, number>
+  }
+  ror: number
+  pop: number
+  contracts: number
+  risk_usd: number
+  margin_usd: number
+  stress: {
+    max_loss: number
+    break_even: number
+    scenarios: Array<{ move: number; pnl: number }>
+  }
+  tier: Tier
+  rank: number
+}
