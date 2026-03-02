@@ -205,10 +205,19 @@ export function ReceiptDrawer({
               <div className="rounded-lg border border-border bg-background p-3">
                 <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Risk Metrics</p>
                 <div className="space-y-1.5">
-                  <FactorRow label="Avg Return" value={pb.risk.avgReturn * 100} signed />
+                  <FactorRow label="Expected Return" value={pb.risk.expectedReturn} signed />
                   <FactorRow label="Max Drawdown" value={pb.risk.maxDrawdown * 100} signed />
-                  <FactorRow label="Sharpe Ratio" value={pb.risk.sharpe} />
-                  <FactorRow label="Win Rate" value={pb.risk.winRate * 100} />
+                  <FactorRow label="Sharpe Ratio" value={pb.risk.sharpeRatio} />
+                  <FactorRow label="Kelly Fraction" value={pb.risk.kellyFraction * 100} />
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-background p-3">
+                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Monte Carlo</p>
+                <div className="space-y-1.5">
+                  <FactorRow label="Median P/L" value={pb.risk.medianPL} signed />
+                  <FactorRow label="10th Pct (Downside)" value={pb.risk.pct10} signed />
+                  <FactorRow label="90th Pct (Upside)" value={pb.risk.pct90} signed />
+                  <FactorRow label="Simulations" value={pb.risk.simCount} />
                 </div>
               </div>
             </>
