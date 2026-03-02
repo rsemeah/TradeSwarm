@@ -76,6 +76,8 @@ function AppContent() {
   }
 
   const rightPaneWidth = 100 - leftPaneWidth - middlePaneWidth
+  const selectedCandidate = candidates[0]
+  const sectionUsesFeedViews = activeSection === "feed-explorer"
 
   return (
     <div className="min-h-screen bg-background">
@@ -242,7 +244,7 @@ function AppContent() {
           <section className="rounded-lg border border-border bg-card p-3">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-semibold capitalize text-foreground">{activeSection.replace(/-/g, " ")}</h2>
-              {!["my-money", "settings"].includes(activeSection) && (
+              {sectionUsesFeedViews && (
                 <div className="flex gap-1 rounded-md border border-border p-1">
                   {(["card", "table", "context", "timeline"] as FeedViewMode[]).map((mode) => (
                     <button
@@ -260,7 +262,7 @@ function AppContent() {
             </div>
 
             <div className="max-h-[calc(100vh-12rem)] overflow-y-auto pr-1">
-              {viewMode === "card" && (
+              {activeSection === "feed-explorer" && viewMode === "card" && (
                 <div className="space-y-3">
                   {candidates.map((candidate) => (
                     <TradeCard key={candidate.ticker} candidate={candidate} />
@@ -268,7 +270,7 @@ function AppContent() {
                 </div>
               )}
 
-              {viewMode === "table" && (
+              {activeSection === "feed-explorer" && viewMode === "table" && (
                 <table className="w-full text-left text-xs">
                   <thead className="sticky top-0 bg-card">
                     <tr className="border-b border-border text-muted-foreground">
@@ -293,7 +295,7 @@ function AppContent() {
                 </table>
               )}
 
-              {viewMode === "context" && (
+              {activeSection === "feed-explorer" && viewMode === "context" && (
                 <div className="space-y-3">
                   {mockThemes.map((theme) => (
                     <div key={theme.name} className="rounded-lg border border-border bg-background p-3">
@@ -306,7 +308,7 @@ function AppContent() {
                 </div>
               )}
 
-              {viewMode === "timeline" && (
+              {activeSection === "feed-explorer" && viewMode === "timeline" && (
                 <ol className="space-y-3 border-l border-border pl-4">
                   {candidates.map((candidate, index) => (
                     <li key={candidate.ticker} className="relative">
@@ -317,6 +319,92 @@ function AppContent() {
                     </li>
                   ))}
                 </ol>
+              )}
+
+              {activeSection === "market-context" && (
+                <div className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg border border-border bg-background p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Last scan</p>
+                      <p className="mt-1 text-sm font-medium text-foreground">{mockRadarData.lastScan}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-background p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Next scan</p>
+                      <p className="mt-1 text-sm font-medium text-foreground">{mockRadarData.nextScan}</p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-background p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Priority symbol</p>
+                      <p className="mt-1 font-mono text-sm font-medium text-foreground">{selectedCandidate?.ticker ?? "--"}</p>
+                    </div>
+                  </div>
+
+                  {mockThemes.map((theme) => (
+                    <div key={theme.name} className="rounded-lg border border-border bg-background p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold text-foreground">{theme.name}</h3>
+                        <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{theme.heat}</span>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">{theme.brief}</p>
+                      <p className="mt-2 font-mono text-[11px] text-accent">{theme.tickers.join(" • ")}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {activeSection === "symbol-explorer" && (
+                <div className="space-y-3">
+                  {candidates.map((candidate) => (
+                    <div key={candidate.ticker} className="rounded-lg border border-border bg-background p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="font-mono text-base font-semibold text-foreground">{candidate.ticker}</p>
+                        <span className="rounded-md border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{candidate.status}</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{candidate.strategy}</p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                        <div className="rounded-md border border-border/70 p-2">
+                          <p className="text-[10px] uppercase text-muted-foreground">Trust score</p>
+                          <p className="font-mono text-sm text-foreground">{candidate.trustScore} / 100</p>
+                        </div>
+                        <div className="rounded-md border border-border/70 p-2">
+                          <p className="text-[10px] uppercase text-muted-foreground">Win likelihood</p>
+                          <p className="font-mono text-sm text-foreground">{candidate.winLikelihoodPct ?? "—"}%</p>
+                        </div>
+                        <div className="rounded-md border border-border/70 p-2">
+                          <p className="text-[10px] uppercase text-muted-foreground">Recommended</p>
+                          <p className="font-mono text-sm text-foreground">{candidate.amountDollars ? formatCurrency(candidate.amountDollars) : "No trade"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {activeSection === "news-narrative" && (
+                <div className="space-y-3">
+                  {mockThemes.map((theme, index) => (
+                    <article key={theme.name} className="rounded-lg border border-border bg-background p-3">
+                      <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Headline {index + 1}</p>
+                      <h3 className="mt-1 text-sm font-semibold text-foreground">{theme.name} narrative update</h3>
+                      <p className="mt-2 text-xs text-muted-foreground">{theme.brief}</p>
+                      <p className="mt-2 text-xs text-foreground">Watch list impact: {theme.tickers.slice(0, 2).join(", ")} remain in focus for next scan.</p>
+                    </article>
+                  ))}
+                </div>
+              )}
+
+              {activeSection === "receipts-audit" && (
+                <div className="space-y-3">
+                  {candidates.map((candidate, index) => (
+                    <div key={candidate.ticker} className="rounded-lg border border-border bg-background p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-mono text-sm font-semibold text-foreground">Receipt · {candidate.ticker}</h3>
+                        <span className="text-[11px] text-muted-foreground">Scan {index + 1}</span>
+                      </div>
+                      <p className="mt-2 text-xs text-muted-foreground">Decision: <span className="text-foreground">{candidate.auditSimple.decision}</span> · Net ELR: <span className="text-foreground">{candidate.auditAdvanced.netElr}</span></p>
+                      <p className="mt-1 text-xs text-muted-foreground">Determinism hash: <span className="font-mono text-foreground">{`${candidate.ticker}-${candidate.trustScore}-${candidate.auditAdvanced.kellyFinal}`}</span></p>
+                    </div>
+                  ))}
+                </div>
               )}
 
               {/* My Money View */}
