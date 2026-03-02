@@ -1,3 +1,4 @@
+// Scanner types - canonical definitions for scan results and candidates
 export type Strategy = 'PCS' | 'CCS' | 'CDS'
 export type Tier = 'A' | 'B' | 'C'
 export type Regime = 'TRENDING' | 'HIGH_VOL' | 'LOW_VOL' | 'CHOPPY' | 'MEAN_REVERT'

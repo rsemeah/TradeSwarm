@@ -1,6 +1,7 @@
 import type { ScanResult } from '@/src/lib/scanner/types'
 import { DealCard } from './DealCard'
 
+/** Renders ranked deals from a scan result */
 export function DealList({ scan }: { scan: ScanResult }) {
   if (scan.empty) return <div className="text-sm text-slate-400">{scan.reason}</div>
   return (
