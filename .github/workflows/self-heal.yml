@@ -1,6 +1,7 @@
 name: Self-Healing Guardian
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
 
@@ -8,9 +9,13 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: self-heal-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   stabilize:
-    if: github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
+    if: github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -24,7 +29,7 @@ jobs:
           version: 10
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: pnpm
@@ -46,41 +51,57 @@ jobs:
 
   auto-fix:
     needs: stabilize
-    if: failure() && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
+    if: failure() && github.event_name == 'pull_request' && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze') && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
-      - name: Checkout
+      - name: Checkout PR branch
         uses: actions/checkout@v6
-
-      - name: Run Codex Auto-Fix
-        uses: openai/codex-action@v1
         with:
-          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
-          prompt: |
-            The CI build failed.
+          ref: ${{ github.head_ref }}
 
-            Fix ONLY:
-            - Missing imports
-            - Type errors
-            - Failing lint rules
-            - Build-time errors
-            - Missing stubs for referenced modules
-            - Env validation errors
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
-            Do NOT:
-            - Change business logic
-            - Bypass safety or determinism checks
-            - Disable failing tests
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
 
-            Make minimal diffs.
-            Commit changes.
-            Push to this PR branch.
+      - name: Install
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Lint fix (if available)
+        run: pnpm -s lint --fix || true
+
+      - name: Format (if available)
+        run: pnpm -s format || true
+
+      - name: Typecheck
+        run: pnpm -s typecheck
+
+      - name: Build
+        run: pnpm -s build
+
+      - name: Commit & push changes (if any)
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(self-heal): auto-fix lint/format"
+          git push
 
   auto-merge:
     needs: stabilize
-    if: success() && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
+    if: success() && github.event_name == 'pull_request' && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
     runs-on: ubuntu-latest
 
     steps:
