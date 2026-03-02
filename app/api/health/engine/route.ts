@@ -127,7 +127,11 @@ export async function GET() {
     }
 
     return Response.json({
+      // Locked contract fields (MUST be present)
       ok: dbOk && yahooOk,
+      service: "engine",
+      ts: new Date().toISOString(),
+      // Extended fields
       status: degraded ? "degraded" : "operational",
       engineVersion: "1.0.0",
       reasonCode: degraded ? "YAHOO_PROBE_DEGRADED" : null,
@@ -180,11 +184,14 @@ export async function GET() {
   } catch (error) {
     return Response.json(
       {
+        // Locked contract fields (MUST be present)
         ok: false,
+        service: "engine",
+        ts: new Date().toISOString(),
+        // Extended fields
         status: "error",
         reasonCode: "ENGINE_HEALTH_FAILED",
         error: String(error),
-        timestamp: new Date().toISOString(),
         latencyMs: Date.now() - startTime,
       },
       { status: 500 }

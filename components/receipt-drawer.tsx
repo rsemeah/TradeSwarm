@@ -26,11 +26,21 @@ export interface ReceiptData {
   }[]
 }
 
-interface ReceiptDrawerProps {
-  isOpen: boolean
-  onClose: () => void
-  receipt: ReceiptData | null
+// Locked contract props (baseline composition surface)
+interface BaseReceiptDrawerProps {
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  children?: React.ReactNode
 }
+
+// Extended props (current implementation)
+interface ExtendedReceiptDrawerProps {
+  isOpen?: boolean       // DEPRECATED: use `open`
+  onClose?: () => void   // DEPRECATED: use `onOpenChange`
+  receipt?: ReceiptData | null
+}
+
+type ReceiptDrawerProps = BaseReceiptDrawerProps & ExtendedReceiptDrawerProps
 
 type TabId = "summary" | "regime" | "risk" | "deliberation" | "scoring"
 
@@ -82,11 +92,51 @@ function FactorRow({
 
 // ─── Main Drawer ──────────────────────────────────────────────────────────────
 
-export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) {
+export function ReceiptDrawer({ 
+  // Contract-compliant props
+  open,
+  onOpenChange,
+  children,
+  // Legacy props (deprecated)
+  isOpen, 
+  onClose, 
+  receipt 
+}: ReceiptDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabId>("summary")
   const [expandedRound, setExpandedRound] = useState<number | null>(0)
 
-  if (!isOpen || !receipt) return null
+  // Support both prop signatures
+  const isVisible = open ?? isOpen ?? false
+  const handleClose = () => {
+    if (onOpenChange) onOpenChange(false)
+    if (onClose) onClose()
+  }
+
+  // If using composition pattern (children), render shell only
+  if (children !== undefined) {
+    if (!isVisible) return null
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={handleClose}>
+        <div 
+          className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-t-2xl bg-card"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between border-b border-border p-4">
+            <h2 className="text-sm font-semibold text-foreground">RECEIPT</h2>
+            <button onClick={handleClose} className="text-muted-foreground hover:text-foreground">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="p-4">{children}</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Legacy implementation with receipt data
+  if (!isVisible || !receipt) return null
 
   const { proofBundle: pb, executedAt } = receipt
   const fd = pb.finalDecision
