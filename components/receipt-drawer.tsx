@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { ProofBundle } from "@/lib/types/proof"
-import type { TradeCandidate, TradeScoringDetail } from "@/lib/types"
+import type { TradeScoringDetail } from "@/lib/types"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,8 +35,8 @@ interface BaseReceiptDrawerProps {
 
 // Extended props (current implementation)
 interface ExtendedReceiptDrawerProps {
-  isOpen?: boolean       // DEPRECATED: use `open`
-  onClose?: () => void   // DEPRECATED: use `onOpenChange`
+  isOpen?: boolean
+  onClose?: () => void
   receipt?: ReceiptData | null
 }
 
@@ -67,20 +67,8 @@ function ScoreBar({ value, max = 100 }: { value: number; max?: number }) {
   )
 }
 
-function FactorRow({
-  label,
-  value,
-  signed = false,
-}: {
-  label: string
-  value: number
-  signed?: boolean
-}) {
-  const display = signed
-    ? value >= 0
-      ? `+${value.toFixed(2)}`
-      : value.toFixed(2)
-    : value.toFixed(2)
+function FactorRow({ label, value, signed = false }: { label: string; value: number; signed?: boolean }) {
+  const display = signed ? (value >= 0 ? `+${value.toFixed(2)}` : value.toFixed(2)) : value.toFixed(2)
   const color = signed ? (value >= 0 ? "text-accent" : "text-danger") : "text-foreground"
   return (
     <div className="flex items-center justify-between gap-2">
@@ -92,15 +80,13 @@ function FactorRow({
 
 // ─── Main Drawer ──────────────────────────────────────────────────────────────
 
-export function ReceiptDrawer({ 
-  // Contract-compliant props
+export function ReceiptDrawer({
   open,
   onOpenChange,
   children,
-  // Legacy props (deprecated)
-  isOpen, 
-  onClose, 
-  receipt 
+  isOpen,
+  onClose,
+  receipt,
 }: ReceiptDrawerProps) {
   const [activeTab, setActiveTab] = useState<TabId>("summary")
   const [expandedRound, setExpandedRound] = useState<number | null>(0)
@@ -117,10 +103,7 @@ export function ReceiptDrawer({
     if (!isVisible) return null
     return (
       <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={handleClose}>
-        <div 
-          className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-t-2xl bg-card"
-          onClick={(e) => e.stopPropagation()}
-        >
+        <div className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-t-2xl bg-card" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between border-b border-border p-4">
             <h2 className="text-sm font-semibold text-foreground">RECEIPT</h2>
             <button onClick={handleClose} className="text-muted-foreground hover:text-foreground">
@@ -158,16 +141,11 @@ export function ReceiptDrawer({
     a.click()
     URL.revokeObjectURL(url)
   }
-  const [activeTab, setActiveTab] = useState<"decision" | "explain" | "provenance">("decision")
-
-  if (!isOpen || !receipt) return null
-
-  const { trade, executedAt, isSimulation, aiConsensus, scoring, gates } = receipt
 
   return (
     <div className="fixed inset-0 z-50">
       {/* Backdrop */}
-      <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm" onClick={handleClose} />
 
       {/* Drawer */}
       <div
@@ -195,9 +173,7 @@ export function ReceiptDrawer({
                 >
                   {pb.action}
                 </span>
-                <span
-                  className={`rounded px-2 py-0.5 text-[10px] font-bold ${verdictColor(fd.action)}`}
-                >
+                <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${verdictColor(fd.action)}`}>
                   {fd.action}
                 </span>
                 {pb.engineDegraded && (
@@ -208,8 +184,8 @@ export function ReceiptDrawer({
               </div>
               <h2 className="mt-1.5 font-mono text-2xl font-bold text-foreground">{pb.ticker}</h2>
               <p className="text-[10px] text-muted-foreground">
-                {executedAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} ET
-                &nbsp;·&nbsp;v{pb.engineVersion}
+                {executedAt.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })} ET &nbsp;·&nbsp;v
+                {pb.engineVersion}
               </p>
             </div>
             <div className="shrink-0 text-right">
@@ -233,8 +209,6 @@ export function ReceiptDrawer({
         {/* Tabs */}
         <div className="flex overflow-x-auto border-b border-border">
           {tabs.map(({ id, label }) => (
-        <div className="flex border-b border-border">
-          {(["decision", "explain", "provenance"] as const).map((tab) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -245,27 +219,19 @@ export function ReceiptDrawer({
               }`}
             >
               {label}
-              {tab}
             </button>
           ))}
         </div>
 
         {/* Content */}
         <div className="max-h-[52vh] overflow-y-auto p-4 space-y-3">
-
-          {/* ── SUMMARY ─────────────────────────────────────────────── */}
+          {/* SUMMARY TAB */}
           {activeTab === "summary" && (
             <>
-        <div className="max-h-[50vh] overflow-y-auto p-4">
-          {activeTab === "decision" && (
-            <div className="space-y-4">
-              {/* Trust Score */}
               <div className="rounded-lg border border-border bg-background p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Trust Score</span>
-                  <span className="font-mono text-lg font-bold text-foreground">
-                    {fd.trustScore}/100
-                  </span>
+                  <span className="font-mono text-lg font-bold text-foreground">{fd.trustScore}/100</span>
                 </div>
                 <ScoreBar value={fd.trustScore} />
               </div>
@@ -275,16 +241,12 @@ export function ReceiptDrawer({
                   pb.preflight.pass ? "border-accent/30 bg-accent/5" : "border-danger/30 bg-danger/5"
                 }`}
               >
-                <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">
-                  Preflight
-                </p>
+                <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">Preflight</p>
                 <p className="text-xs text-foreground">{pb.preflight.reason}</p>
                 <div className="mt-2 space-y-1">
                   {pb.preflight.gates.map((g, i) => (
                     <div key={i} className="flex items-center gap-2 text-[10px]">
-                      <span className={g.passed ? "text-accent" : "text-danger"}>
-                        {g.passed ? "✓" : "✗"}
-                      </span>
+                      <span className={g.passed ? "text-accent" : "text-danger"}>{g.passed ? "✓" : "✗"}</span>
                       <span className="text-muted-foreground">{g.name}</span>
                     </div>
                   ))}
@@ -294,9 +256,7 @@ export function ReceiptDrawer({
               {fd.bullets && (
                 <>
                   <div className="rounded-lg border border-border bg-background p-3">
-                    <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">
-                      Why This Trade
-                    </p>
+                    <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">Why This Trade</p>
                     <p className="text-xs leading-relaxed text-foreground">{fd.bullets.why}</p>
                   </div>
                   <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
@@ -304,26 +264,20 @@ export function ReceiptDrawer({
                     <p className="text-xs leading-relaxed text-foreground">{fd.bullets.risk}</p>
                   </div>
                   <div className="rounded-lg border border-border bg-background p-3">
-                    <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">
-                      Position
-                    </p>
+                    <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">Position</p>
                     <p className="text-xs leading-relaxed text-foreground">{fd.bullets.amount}</p>
                   </div>
                 </>
               )}
 
               <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">
-                  Engine Events
-                </p>
+                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Engine Events</p>
                 <div className="space-y-1">
                   {pb.events.map((ev, i) => (
                     <div key={i} className="flex items-center justify-between text-[10px]">
                       <span className="font-mono text-foreground">{ev.name}</span>
                       <div className="flex items-center gap-2">
-                        {ev.durationMs !== undefined && (
-                          <span className="text-muted-foreground">{ev.durationMs}ms</span>
-                        )}
+                        {ev.durationMs !== undefined && <span className="text-muted-foreground">{ev.durationMs}ms</span>}
                         <span className={statusColor(ev.status)}>{ev.status}</span>
                       </div>
                     </div>
@@ -333,7 +287,7 @@ export function ReceiptDrawer({
             </>
           )}
 
-          {/* ── REGIME ──────────────────────────────────────────────── */}
+          {/* REGIME TAB */}
           {activeTab === "regime" && (
             <>
               <div className="grid grid-cols-3 gap-2">
@@ -344,9 +298,7 @@ export function ReceiptDrawer({
                 ].map(({ label, value }) => (
                   <div key={label} className="rounded-lg border border-border bg-background p-3">
                     <p className="text-[10px] text-muted-foreground">{label}</p>
-                    <p className="mt-0.5 font-mono text-sm font-bold capitalize text-foreground">
-                      {value}
-                    </p>
+                    <p className="mt-0.5 font-mono text-sm font-bold capitalize text-foreground">{value}</p>
                   </div>
                 ))}
               </div>
@@ -362,9 +314,7 @@ export function ReceiptDrawer({
               </div>
 
               <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">
-                  Signals
-                </p>
+                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Signals</p>
                 <div className="space-y-1.5">
                   <FactorRow label="SMA20" value={pb.regime.inputs.sma20} />
                   <FactorRow label="SMA50" value={pb.regime.inputs.sma50} />
@@ -374,183 +324,98 @@ export function ReceiptDrawer({
                   <FactorRow label="Volume Ratio" value={pb.regime.inputs.volumeRatio} />
                 </div>
               </div>
-
-              {pb.marketContext.quote && (
-                <div className="rounded-lg border border-border bg-background p-3">
-                  <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">
-                    Live Quote
-                  </p>
-                  <div className="space-y-1.5">
-                    <FactorRow label="Price" value={pb.marketContext.quote.price} />
-                    <FactorRow label="Change %" value={pb.marketContext.quote.changePercent} signed />
-                    <FactorRow
-                      label="Volume / Avg"
-                      value={
-                        pb.marketContext.quote.avgVolume > 0
-                          ? pb.marketContext.quote.volume / pb.marketContext.quote.avgVolume
-                          : 0
-                      }
-                    />
-                    <FactorRow label="SMA50" value={pb.marketContext.quote.sma50} />
-                    <FactorRow label="SMA200" value={pb.marketContext.quote.sma200} />
-                  </div>
-                  <p className="mt-2 text-[9px] text-muted-foreground">
-                    {pb.marketContext.quote.source} ·{" "}
-                    {new Date(pb.marketContext.quote.fetchedAt).toLocaleTimeString()}
-                    {pb.marketContext.providerHealth.cached ? " · cached" : ""}
-                  </p>
-                </div>
-              )}
-
-              {pb.marketContext.chain && (
-                <div className="rounded-lg border border-border bg-background p-3">
-                  <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">
-                    Options Chain
-                  </p>
-                  <div className="space-y-1.5">
-                    <FactorRow
-                      label="Put/Call Ratio"
-                      value={pb.marketContext.chain.putCallRatio ?? 0}
-                    />
-                    <FactorRow label="Call Volume" value={pb.marketContext.chain.callVolume ?? 0} />
-                    <FactorRow label="Put Volume" value={pb.marketContext.chain.putVolume ?? 0} />
-                  </div>
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">
-                    Expirations: {pb.marketContext.chain.expirations.slice(0, 4).join(" · ")}
-                  </p>
-                </div>
-              
-              {/* Decision */}
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold text-muted-foreground">DECISION</p>
-                <p className="text-xs text-foreground leading-relaxed">{trade.bullets.why}</p>
-              </div>
-
-              {scoring && (
-                <div className="rounded-lg border border-border bg-background p-3">
-                  <p className="mb-2 text-[10px] font-bold text-muted-foreground">SCORING EXPLANATION</p>
-                  {scoring.factors.slice(0, 4).map((factor) => (
-                    <div key={factor.name} className="flex items-center justify-between text-[10px]">
-                      <span className="text-muted-foreground">{factor.name}</span>
-                      <span className="font-mono text-foreground">{factor.impact >= 0 ? "+" : ""}{factor.impact}</span>
-                    </div>
-                  ))}
-                  <p className="mt-2 text-[10px] text-muted-foreground">{scoring.formula.policy}</p>
-                </div>
-              )}
-              
-              {/* Risk */}
-              <div className="rounded-lg border border-warning/30 bg-warning/5 p-3">
-                <p className="mb-2 text-[10px] font-bold text-warning">RISK OVERLAY</p>
-                <p className="text-xs text-foreground leading-relaxed">{trade.bullets.risk}</p>
-              </div>
-
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
-                <p className="mb-2 text-[10px] font-bold text-accent">REGIME OVERLAY</p>
-                <p className="text-xs text-foreground leading-relaxed">
-                  Regime score {trade.auditAdvanced.regimeScore.toFixed(2)} supports a {trade.status} decision with liquidity score {trade.auditAdvanced.liquidityScore.toFixed(2)}.
-                </p>
-              </div>
-            </div>
+            </>
           )}
 
-          {activeTab === "explain" && (
-            <div className="space-y-4">
-              {aiConsensus && (
-                <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Consensus Strength</span>
-                    <span className="font-mono text-lg font-bold text-accent">
-                      {aiConsensus.consensusStrength}%
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[10px] text-muted-foreground">
-                    Final Verdict: <span className="font-medium text-foreground">{aiConsensus.finalVerdict}</span>
-                  </p>
-                </div>
-              )}
-
+          {/* RISK TAB */}
+          {activeTab === "risk" && (
+            <>
               <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold text-muted-foreground">DELIBERATION TIMELINE</p>
-                <ol className="space-y-1 text-xs text-muted-foreground">
-                  <li>1. Candidate screened and scored for trust + win likelihood.</li>
-                  <li>2. Regime overlay applied against momentum and liquidity constraints.</li>
-                  <li>3. Risk overlay checked with Kelly and POP lower bound constraints.</li>
-                  <li>4. Final recommendation emitted as {trade.status}.</li>
-                </ol>
+                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Risk Simulation</p>
+                <div className="space-y-1.5">
+                  <FactorRow label="Avg Return" value={pb.risk.avgReturn * 100} signed />
+                  <FactorRow label="Max Drawdown" value={pb.risk.maxDrawdown * 100} signed />
+                  <FactorRow label="Sharpe Ratio" value={pb.risk.sharpe} />
+                  <FactorRow label="Win Rate" value={pb.risk.winRate * 100} />
+                  <FactorRow label="Profit Factor" value={pb.risk.profitFactor} />
+                </div>
               </div>
 
-              {aiConsensus?.groq && (
-                <AIResponseCard 
-                  name="Groq (Llama 3.3 70B)" 
-                  response={aiConsensus.groq}
-                  color="accent"
-                />
-              )}
-              {aiConsensus?.openai && (
-                <AIResponseCard 
-                  name="OpenAI (GPT-4o-mini)" 
-                  response={aiConsensus.openai}
-                  color="blue"
-                />
-              )}
-              {aiConsensus?.anthropic && (
-                <AIResponseCard 
-                  name="Anthropic (Claude Haiku)" 
-                  response={aiConsensus.anthropic}
-                  color="orange"
-                />
+              <div className="rounded-lg border border-border bg-background p-3">
+                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">VaR Analysis</p>
+                <div className="space-y-1.5">
+                  <FactorRow label="VaR 95%" value={pb.risk.var95 * 100} signed />
+                  <FactorRow label="VaR 99%" value={pb.risk.var99 * 100} signed />
+                </div>
+              </div>
+
+              {pb.risk.regimeAdjustment && (
+                <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
+                  <p className="mb-1 text-[10px] font-bold text-accent">Regime Adjustment</p>
+                  <p className="text-xs text-foreground">{pb.risk.regimeAdjustment}</p>
+                </div>
               )}
             </>
           )}
 
-          {/* ── RISK ────────────────────────────────────────────────── */}
-          {activeTab === "risk" && (
+          {/* DELIBERATION TAB */}
+          {activeTab === "deliberation" && (
             <>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-lg border border-border bg-background p-3">
-                  <p className="text-[10px] text-muted-foreground">Risk Level</p>
-                  <p
-                    className={`mt-0.5 font-mono text-lg font-bold capitalize ${
-                      pb.risk.riskLevel === "low"
-                        ? "text-accent"
-                        : pb.risk.riskLevel === "extreme"
-                          ? "text-danger"
-                          : "text-warning"
-                    }`}
+              {pb.modelRounds.map((round, i) => (
+                <div key={i} className="rounded-lg border border-border bg-background overflow-hidden">
+                  <button
+                    onClick={() => setExpandedRound(expandedRound === i ? null : i)}
+                    className="w-full flex items-center justify-between p-3 text-left"
                   >
-                    {pb.risk.riskLevel}
-                  </p>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-medium text-foreground">{round.model}</span>
+                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${verdictColor(round.decision)}`}>
+                        {round.decision}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">{round.confidence}%</span>
+                      <svg
+                        className={`h-4 w-4 text-muted-foreground transition-transform ${expandedRound === i ? "rotate-180" : ""}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </button>
+                  {expandedRound === i && (
+                    <div className="border-t border-border p-3">
+                      <p className="text-xs leading-relaxed text-foreground">{round.reasoning}</p>
+                      <p className="mt-2 text-[9px] text-muted-foreground">{round.durationMs}ms</p>
+                    </div>
+                  )}
                 </div>
-                <div className="rounded-lg border border-border bg-background p-3">
-                  <p className="text-[10px] text-muted-foreground">Sharpe Ratio</p>
-                  <p className="mt-0.5 font-mono text-lg font-bold text-foreground">
-                    {pb.risk.sharpeRatio.toFixed(2)}
-                  </p>
+              ))}
+            </>
+          )}
+
+          {/* SCORING TAB */}
+          {activeTab === "scoring" && (
+            <>
+              <div className="rounded-lg border border-border bg-background p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Final Trust Score</span>
+                  <span className="font-mono text-lg font-bold text-foreground">{fd.trustScore}/100</span>
                 </div>
+                <ScoreBar value={fd.trustScore} />
               </div>
 
               <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">
-                  Monte Carlo (n={pb.risk.simCount})
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { label: "10th pct (downside)", value: pb.risk.pct10, pos: false },
-                    { label: "Median P&L", value: pb.risk.medianPL, pos: pb.risk.medianPL >= 0 },
-                    { label: "90th pct (upside)", value: pb.risk.pct90, pos: true },
-                    {
-                      label: "Expected Return",
-                      value: pb.risk.expectedReturn,
-                      pos: pb.risk.expectedReturn >= 0,
-                    },
-                  ].map(({ label, value, pos }) => (
-                    <div key={label} className="flex justify-between items-center">
-                      <span className="text-[10px] text-muted-foreground">{label}</span>
-                      <span
-                        className={`font-mono text-xs font-bold ${pos ? "text-accent" : "text-danger"}`}
-                      >
-                        {value >= 0 ? "+" : ""}${value.toFixed(0)}
+                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Score Factors</p>
+                <div className="space-y-1.5">
+                  {pb.scoring.factors.map((f, i) => (
+                    <div key={i} className="flex items-center justify-between text-[10px]">
+                      <span className="text-muted-foreground">{f.name}</span>
+                      <span className={`font-mono ${f.impact >= 0 ? "text-accent" : "text-danger"}`}>
+                        {f.impact >= 0 ? "+" : ""}
+                        {f.impact}
                       </span>
                     </div>
                   ))}
@@ -558,226 +423,19 @@ export function ReceiptDrawer({
               </div>
 
               <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">
-                  Position Sizing
-                </p>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-muted-foreground">Kelly Fraction</span>
-                    <span className="font-mono text-xs text-foreground">
-                      {(pb.risk.kellyFraction * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-muted-foreground">Recommended Size</span>
-                    <span className="font-mono text-xs font-bold text-foreground">
-                      ${pb.risk.positionSizeRecommended.toFixed(0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] text-muted-foreground">Max Drawdown</span>
-                    <span className="font-mono text-xs font-bold text-danger">
-                      {(pb.risk.maxDrawdown * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-
-          {/* ── DELIBERATION ────────────────────────────────────────── */}
-          {activeTab === "deliberation" && (
-            <>
-              {pb.deliberation.length === 0 ? (
-                <p className="py-6 text-center text-xs text-muted-foreground">
-                  No deliberation rounds (engine blocked before AI stage)
-                </p>
-              ) : (
-                pb.deliberation.map((round, ri) => (
-                  <div
-                    key={ri}
-                    className="overflow-hidden rounded-lg border border-border bg-background"
-                  >
-                    <button
-                      className="flex w-full items-center justify-between p-3 text-left"
-                      onClick={() => setExpandedRound(expandedRound === ri ? null : ri)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase text-muted-foreground">
-                          {round.stage}
-                        </span>
-                        <span
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${verdictColor(round.outcome.decision)}`}
-                        >
-                          {round.outcome.decision}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-muted-foreground">
-                          {(round.outcome.consensusStrength * 100).toFixed(0)}% agree
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {expandedRound === ri ? "▲" : "▼"}
-                        </span>
-                      </div>
-                    </button>
-
-                    {expandedRound === ri && (
-                      <div className="space-y-3 border-t border-border p-3">
-                        <p className="text-[10px] text-muted-foreground">{round.outcome.reason}</p>
-                        {round.outputs.map((o, oi) => (
-                          <div
-                            key={oi}
-                            className="rounded border border-border/50 bg-background/50 p-2"
-                          >
-                            <div className="mb-1 flex items-center justify-between">
-                              <span className="text-[10px] font-medium text-foreground">
-                                {o.provider}
-                                <span className="ml-1 text-muted-foreground">
-                                  ({o.modelVersion})
-                                </span>
-                              </span>
-                              <span
-                                className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${verdictColor(o.decision)}`}
-                              >
-                                {o.decision}
-                              </span>
-                            </div>
-                            <div className="mb-1.5 flex items-center gap-2">
-                              <span className="text-[9px] text-muted-foreground">Confidence:</span>
-                              <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
-                                <div
-                                  className="h-full rounded-full bg-accent"
-                                  style={{ width: `${o.confidence}%` }}
-                                />
-                              </div>
-                              <span className="font-mono text-[9px] text-foreground">
-                                {o.confidence}%
-                              </span>
-                            </div>
-                            {o.winLikelihoodPct !== null && (
-                              <p className="mb-1 text-[9px] text-muted-foreground">
-                                Win likelihood: {o.winLikelihoodPct}%
-                              </p>
-                            )}
-                            <p className="text-[10px] leading-relaxed text-muted-foreground">
-                              {o.reasoning}
-                            </p>
-                            <p className="mt-1 text-[9px] text-muted-foreground/60">{o.latencyMs}ms</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-          {activeTab === "provenance" && (
-            <div className="space-y-2">
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold text-muted-foreground">PROVENANCE</p>
-                <p className="text-xs text-muted-foreground">Decision artifacts are derived from trust metrics, gate checks, and AI consensus traces.</p>
-              </div>
-              {gates?.map((gate, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center justify-between rounded-lg border p-3 ${
-                    gate.passed ? "border-accent/30 bg-accent/5" : "border-danger/30 bg-danger/5"
-                  }`}
-                >
-                  <div>
-                    <p className="text-xs font-medium text-foreground">{gate.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{gate.value} {gate.passed ? "≥" : "<"} {gate.threshold}</p>
-                  </div>
-                ))
-              )}
-            </>
-          )}
-
-          {/* ── SCORING ─────────────────────────────────────────────── */}
-          {activeTab === "scoring" && (
-            <>
-              <div className="rounded-lg border border-border bg-background p-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Final Trust Score</span>
-                  <span className="font-mono text-2xl font-bold text-foreground">
-                    {pb.scoring.trustScore}/100
-                  </span>
-                </div>
-                <ScoreBar value={pb.scoring.trustScore} />
-              </div>
-
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">
-                  Composition
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { label: "Raw Avg Confidence", value: pb.scoring.rawAvgScore },
-                    { label: "Agreement Ratio", value: pb.scoring.agreementRatio * 100 },
-                    { label: "Penalty Factor", value: pb.scoring.penaltyFactor * 100 },
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <div className="flex justify-between">
-                        <span className="text-[10px] text-muted-foreground">{label}</span>
-                        <span className="font-mono text-[10px] text-foreground">
-                          {value.toFixed(0)}%
-                        </span>
-                      </div>
-                      <ScoreBar value={value} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">
-                  Factors
-                </p>
-                <div className="space-y-1.5">
-                  <FactorRow
-                    label={`Model Agreement (×${pb.scoring.weights.modelAgreement})`}
-                    value={pb.scoring.factors.modelAgreement}
-                  />
-                  <FactorRow
-                    label={`Provider Credibility (×${pb.scoring.weights.providerCredibility})`}
-                    value={pb.scoring.factors.providerCredibility}
-                  />
-                  <FactorRow
-                    label={`Regime Alignment (×${pb.scoring.weights.regimeAlignmentBonus})`}
-                    value={pb.scoring.factors.regimeAlignmentBonus}
-                    signed
-                  />
-                  <FactorRow
-                    label={`Risk Penalty (×${pb.scoring.weights.riskPenalty})`}
-                    value={pb.scoring.factors.riskPenalty}
-                    signed
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">
-                  Request ID
-                </p>
-                <p className="break-all font-mono text-[9px] text-muted-foreground">
-                  {pb.requestId}
-                </p>
+                <p className="mb-1 text-[10px] font-bold uppercase text-muted-foreground">Scoring Policy</p>
+                <p className="text-xs text-foreground">{pb.scoring.formula.policy}</p>
               </div>
             </>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2 border-t border-border p-3">
-          <button
-            onClick={handleExport}
-            className="flex-1 rounded-lg border border-border py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Export Proof
+        <div className="border-t border-border p-4 flex items-center justify-between">
+          <button onClick={handleExport} className="text-[10px] text-muted-foreground hover:text-foreground">
+            Export JSON
           </button>
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-lg bg-muted py-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/80"
-          >
-            Close
-          </button>
+          <p className="text-[9px] text-muted-foreground font-mono">{pb.requestId}</p>
         </div>
       </div>
     </div>
