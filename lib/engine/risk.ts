@@ -22,7 +22,29 @@ interface RiskParams {
   balance: number
   trustScore: number
   regime: RegimeSnapshot
+  seed: number
   strategy?: "bullish_spread" | "bearish_spread" | "iron_condor"
+}
+
+function mulberry32(seed: number) {
+  return function () {
+    seed |= 0
+    seed = seed + 0x6D2B79F5 | 0
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed)
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
+    return ((t ^ t >>> 14) >>> 0) / 4294967296
+  }
+}
+
+export function deriveSeedFromString(input: string): number {
+  // djb2 hash (32-bit) for deterministic replay seed generation.
+  let hash = 5381
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash) + input.charCodeAt(i)
+    hash |= 0
+  }
+
+  return hash >>> 0
 }
 
 /**
@@ -31,14 +53,16 @@ interface RiskParams {
 function runMonteCarloLite(
   expectedReturn: number,
   volatility: number,
+  seed: number,
   simulations: number = 1000
 ): { returns: number[]; percentiles: Record<number, number> } {
   const returns: number[] = []
+  const random = mulberry32(seed)
 
   for (let i = 0; i < simulations; i++) {
     // Box-Muller transform for normal distribution
-    const u1 = Math.random()
-    const u2 = Math.random()
+    const u1 = Math.max(random(), Number.EPSILON)
+    const u2 = random()
     const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
     
     // Simulated return based on expected return and volatility
@@ -97,7 +121,7 @@ function calculateVolatility(regime: RegimeSnapshot): number {
  * Simulate risk for a potential trade
  */
 export function simulateRisk(params: RiskParams): RiskSnapshot {
-  const { amount, balance, trustScore, regime, strategy } = params
+  const { amount, balance, trustScore, regime, seed, strategy } = params
 
   // Calculate expected return and volatility
   const expectedReturnPct = calculateExpectedReturn(trustScore, regime)
@@ -115,7 +139,7 @@ export function simulateRisk(params: RiskParams): RiskSnapshot {
   const adjustedVolatility = volatility * strategyMultiplier
 
   // Run Monte Carlo simulation
-  const simulation = runMonteCarloLite(adjustedExpectedReturn, adjustedVolatility)
+  const simulation = runMonteCarloLite(adjustedExpectedReturn, adjustedVolatility, seed)
 
   // Calculate dollar values
   const expectedReturn = amount * adjustedExpectedReturn

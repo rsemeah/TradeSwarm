@@ -38,10 +38,12 @@ function getTargetExpiries(dte_range: [number, number]): string[] {
 async function detectRegimeSafe(ticker: string): Promise<RegimeResult> {
   try {
     const module = await import('@/lib/engine/regime')
-    const detect = (module as { detectRegime?: (t: string) => Promise<RegimeResult> | RegimeResult }).detectRegime
+    const detect = (module as unknown as { detectRegime?: (t: string) => Promise<unknown> | unknown }).detectRegime
     if (!detect) return DEFAULT_REGIME
-    const out = await detect(ticker)
-    return { regime: out.regime, confidence: out.confidence ?? 0, source: out.source ?? 'adapter' }
+    const out = await detect(ticker) as { regime?: RegimeResult['regime']; trend?: string; confidence?: number; source?: string }
+    const mappedRegime = out.regime
+      ?? (out.trend === 'bullish' ? 'TRENDING' : out.trend === 'bearish' ? 'HIGH_VOL' : 'CHOPPY')
+    return { regime: mappedRegime, confidence: out.confidence ?? 0, source: out.source ?? 'adapter' }
   } catch {
     return DEFAULT_REGIME
   }

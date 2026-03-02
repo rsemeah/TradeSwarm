@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import { runCanonicalTrade } from "@/lib/engine/runCanonicalTrade"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { collectInstitutionalValidation, shouldFreezeExecution } from "@/lib/engine/institutionalValidation"
 
 export async function POST(req: Request) {
   const correlationId = crypto.randomUUID()
@@ -47,6 +49,20 @@ export async function POST(req: Request) {
     }
 
     const amount = Number(requestedAmount ?? Math.round(balance * 0.015 * 100) / 100)
+
+    const admin = createAdminClient()
+    const validation = await collectInstitutionalValidation(admin)
+    if (shouldFreezeExecution(validation)) {
+      return Response.json(
+        {
+          error: "Execution is frozen by institutional validation gates",
+          reasonCode: "INSTITUTIONAL_FREEZE_ACTIVE",
+          correlationId,
+          validation,
+        },
+        { status: 423 }
+      )
+    }
 
     const result = await runCanonicalTrade({
       mode: "execute",

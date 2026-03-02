@@ -14,6 +14,7 @@ export interface ScanConfig {
 
 export interface RawCandidate {
   id: string
+  id?: string
   ticker: string
   underlying_price: number
   strategy: Strategy
@@ -82,4 +83,16 @@ export interface ScanResult {
   // Empty state fields (for when scan finds no candidates)
   empty?: boolean
   reason?: string
+  score: { display: string; value: number }
+  ror: number
+  contracts: number
+  stress?: unknown
+  truthSerum?: unknown
+  news: { macroFlags: string[] }
+}
+
+export interface ScanResult {
+  empty: boolean
+  reason?: string
+  deals: RankedDeal[]
 }

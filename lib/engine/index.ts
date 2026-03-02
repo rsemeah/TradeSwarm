@@ -42,10 +42,11 @@ export type {
 
 // ─── Legacy (radar screen analysis — no orchestrator, no DB writes) ────────
 export { runTradeSwarm as runTradeSwarmLegacy } from "./runTradeSwarm"
+export { runTradeSwarm as runLegacyTradeSwarm } from "./runTradeSwarm"
 export type { TradeSwarmProofBundle, RunTradeSwarmMode } from "./runTradeSwarm"
 
 import { detectRegime, regimeToContext } from "./regime"
-import { simulateRisk, riskToContext } from "./risk"
+import { deriveSeedFromString, simulateRisk, riskToContext } from "./risk"
 import type { RegimeSnapshot } from "./regime"
 import type { RiskSnapshot } from "./risk"
 
@@ -65,7 +66,8 @@ export async function runEngineAnalysis(
   trustScore: number
 ): Promise<EngineAnalysis> {
   const regime = await detectRegime(ticker)
-  const risk = simulateRisk({ ticker, amount, balance, trustScore, regime })
+  const seed = deriveSeedFromString(`${ticker}:${amount}:${balance}:${trustScore}`)
+  const risk = simulateRisk({ ticker, amount, balance, trustScore, regime, seed })
   return {
     ticker,
     regime,

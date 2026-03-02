@@ -66,10 +66,8 @@ export function TradeProvider({ children }: { children: ReactNode }) {
         ...s,
         isLoading: false,
         lastResult: {
-          success: response.ok && data.success,
+          success: response.ok && Boolean(data.success),
           message: data.message || data.reason || data.error || "Trade executed",
-          success: response.ok,
-          message: data.message || data.error || "Trade executed",
           reasonCode: data.reasonCode,
           data,
         },

@@ -33,7 +33,7 @@ interface PersistedMarketSnapshot {
 
 function buildModelRounds(bundle: ProofBundle): ModelRound[] {
   return bundle.deliberation.map((round) => ({
-    round_id: round.roundId,
+    round_id: String(round.roundId),
     stage: round.stage,
     providers: round.outputs.map((output) => ({
       provider: output.provider,
@@ -110,7 +110,7 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
     provider_health: bundle.marketContext.providerHealth,
     as_of: bundle.marketContext.ts,
     source: "orchestrator.marketContext",
-    latency_ms: null,
+    latency_ms: undefined,
   }
 
   const marketSnapshotHash = hashDeterministic(normalizedMarketSnapshot)
@@ -119,7 +119,7 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
     safety_mode: input.safetyMode,
     theme: input.theme,
   })
-  const randomSeed = null
+  const randomSeed = Number.isFinite(bundle.risk.monteCarloSeed) ? bundle.risk.monteCarloSeed : null
   const determinismHash = hashDeterministic({
     input_snapshot: normalizedInputSnapshot,
     market_snapshot_hash: marketSnapshotHash,
@@ -132,8 +132,8 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
     version: "v2",
     model_provider: firstOutput?.provider ?? "unknown",
     model_version: firstOutput?.model_version ?? "unknown",
-    regime_snapshot: bundle.regime,
-    risk_snapshot: bundle.risk,
+    regime_snapshot: bundle.regime as unknown as Record<string, unknown>,
+    risk_snapshot: bundle.risk as unknown as Record<string, unknown>,
     safety_decision: safetyDecision,
     model_rounds: modelRounds,
     consensus_score: modelRounds[modelRounds.length - 1]?.outcome.consensus_strength ?? 0,
@@ -155,6 +155,7 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
         config_hash: configHash,
         determinism_hash: determinismHash,
         random_seed: randomSeed,
+        monte_carlo_seed: randomSeed,
       },
     },
   }
@@ -198,6 +199,7 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
       engine_version: canonicalBundle.metadata.determinism.engine_version,
       config_hash: canonicalBundle.metadata.determinism.config_hash,
       random_seed: canonicalBundle.metadata.determinism.random_seed,
+      monte_carlo_seed: canonicalBundle.metadata.determinism.random_seed,
     })
   }
 

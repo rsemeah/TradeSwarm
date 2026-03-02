@@ -29,7 +29,8 @@ app/api/
 │   └── simulate/               # Monte Carlo simulation
 ├── internal/
 │   ├── ops/calibration-metrics # Calibration dashboard
-│   └── ops/replay/[id]         # Deterministic replay
+│   ├── ops/replay/[id]         # Deterministic replay
+│   └── ops/validation-report   # Institutional validation report
 ├── health/                     # System + engine health
 └── learn-why/                  # AI explainer
 
@@ -76,6 +77,17 @@ Every receipt includes:
 - `determinism_hash` - Hash of normalized inputs + snapshot + config
 - `engine_version` - For version-aware replay
 
+
+### Institutional Validation Gates
+Execution is fail-closed when governance checks are not met. `/api/trade/execute` now evaluates:
+- empirical trade count (`MIN_EMPIRICAL_TRADES`, default `30`)
+- deterministic receipt coverage
+- replay mismatch drift
+- operator journal completeness
+- rolling drawdown and ruin probability bounds
+
+Operators can enforce or release freeze via the `system_controls` table (`trade_engine_frozen`). Validation snapshots are exposed at `/api/internal/ops/validation-report`.
+
 ### Safety Evaluator
 Hard blocks for:
 - Spread > threshold
@@ -95,6 +107,7 @@ Hard blocks for:
 | `/api/trade/simulate` | POST | Monte Carlo simulation |
 | `/api/internal/ops/replay/[id]` | POST | Replay a receipt |
 | `/api/internal/ops/calibration-metrics` | GET | Calibration dashboard |
+| `/api/internal/ops/validation-report` | GET | Validation + freeze recommendation |
 | `/api/internal/jobs/outcome-tracker` | POST | Track trade outcomes |
 
 ## Database Schema
@@ -109,16 +122,23 @@ Migrations in `scripts/`:
 
 ## Environment Variables
 
+Vercel deployment/runtime requires these variables for API routes:
+
 ```env
 # Required
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-GROQ_API_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+GROQ_API_KEY=                 # Model provider key used by default
 
 # Optional
-AI_GATEWAY_API_KEY=           # Enables OpenAI/Anthropic
+AI_GATEWAY_API_KEY=           # Enables OpenAI gateway path
+OPENAI_API_KEY=               # Optional direct OpenAI key
+INTERNAL_JOBS_TOKEN=          # Protects internal cron/ops routes
 REPLAY_COVERAGE_THRESHOLD=0   # Block execute if coverage < threshold
 REPLAY_MISMATCH_THRESHOLD=1   # Block execute if mismatch rate > threshold
+MIN_EMPIRICAL_TRADES=30       # Freeze execute until this trade count exists
+MAX_RUIN_PROBABILITY=0.05     # Damp sizing / freeze when exceeded
 ```
 
 ## Development
@@ -133,8 +153,11 @@ pnpm build
 
 ## CI/CD
 
-- `.github/workflows/ci.yml` - Lint, typecheck, build on push/PR
-- `.github/dependabot.yml` - Weekly dependency updates
+- `.github/workflows/ci.yml` - Deterministic CI gate (lint, typecheck, build)
+- `.github/workflows/codex-policy.yml` - Codex PR policy review via `openai/codex-action@v1`
+- `.github/workflows/dependabot-auto-merge.yml` - Enables auto-merge for labeled Dependabot PRs
+- `.github/dependabot.yml` - Weekly dependency updates with grouped patch/minor bumps
+- `AGENTS.md` - Repository policy contract used by Codex and maintainers
 
 ## License
 
