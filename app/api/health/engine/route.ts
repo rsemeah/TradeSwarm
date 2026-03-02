@@ -72,40 +72,66 @@ export async function GET() {
   try {
     const supabase = await createClient()
 
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
     // DB + Yahoo probes in parallel
-    const [dbResult, yahooResult] = await Promise.all([
+    const [dbResult, yahooResult, tradesResult, receiptsResult] = await Promise.all([
       supabase
         .from("trade_receipts")
         .select("*", { count: "exact", head: true }),
       probeMarketDataHealth(),
-    ])
-
-    // Recent activity (last 24h)
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
-    const [{ count: tradeCount }, { data: recentEvents, count: eventCount }] = await Promise.all([
       supabase
         .from("trades")
-        .select("*", { count: "exact", head: true })
-        .gte("created_at", yesterday),
-      supabase
-        .from("engine_events")
-        .select("name, status, created_at", { count: "exact" })
+        .select("*", { count: "exact" })
         .gte("created_at", yesterday)
         .order("created_at", { ascending: false })
-        .limit(50),
+        .limit(10),
+      supabase
+        .from("trade_receipts")
+        .select("*", { count: "exact", head: true })
+        .gte("created_at", yesterday),
     ])
 
-    const errEvents = recentEvents?.filter((e) => e.status === "error") ?? []
-    const blockedEvents = recentEvents?.filter((e) => e.status === "blocked") ?? []
+    const recentTrades = tradesResult.data || []
+    const tradeCount = tradesResult.count || 0
+    const receiptCount = receiptsResult.count || 0
+
+    const successfulTrades = recentTrades.filter((t) => t.status === "GO")
+    const successRate = tradeCount ? (successfulTrades.length / tradeCount) * 100 : 0
+
+    const [quoteProbe, expirationProbe] = await Promise.all([
+      probeYahooQuote("SPY"),
+      probeYahooExpirations("SPY"),
+    ])
 
     const dbOk = !dbResult.error
-    const yahooOk = yahooResult.status !== "down"
-    const ok = dbOk && yahooOk
+    const yahooOk = yahooResult.status !== "down" && quoteProbe.status === "ok"
+    const degraded = quoteProbe.status !== "ok" || expirationProbe.status !== "ok"
+
+    const adapterDiagnostics = {
+      groq: {
+        status: process.env.GROQ_API_KEY ? "ok" : "not_configured",
+        configured: !!process.env.GROQ_API_KEY,
+      },
+      openai: {
+        status: process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY ? "ok" : "not_configured",
+        configured: !!process.env.OPENAI_API_KEY || !!process.env.AI_GATEWAY_API_KEY,
+      },
+      supabase: {
+        status: dbOk ? "ok" : "error",
+      },
+      yahoo: {
+        quote: quoteProbe,
+        expirations: expirationProbe,
+      },
+    }
 
     return Response.json({
-      ok,
+      ok: dbOk && yahooOk,
+      status: degraded ? "degraded" : "operational",
       engineVersion: "1.0.0",
+      reasonCode: degraded ? "YAHOO_PROBE_DEGRADED" : null,
+      lastActivity: recentTrades[0]?.created_at || null,
       checks: {
         db: {
           ok: dbOk,
@@ -118,75 +144,12 @@ export async function GET() {
           latencyMs: yahooResult.latencyMs,
           symbols: yahooResult.symbols,
         },
-        orchestrator: {
-          ok: true,
-          components: {
-            regime: "live",
-            risk: "live",
-            deliberation: "live",
-            scoring: "live",
-            events: "live",
-          },
-        },
       },
       metrics: {
-        tradesLast24h: tradeCount ?? 0,
-        eventsLast24h: eventCount ?? 0,
-        errorsLast24h: errEvents.length,
-        blockedLast24h: blockedEvents.length,
-      },
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
-    const { data: recentTrades, count: tradeCount } = await supabase
-      .from("trades")
-      .select("*", { count: "exact" })
-      .gte("created_at", yesterday)
-      .order("created_at", { ascending: false })
-      .limit(10)
-
-    const { count: receiptCount } = await supabase
-      .from("trade_receipts")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", yesterday)
-
-    const successfulTrades = recentTrades?.filter((t) => t.status === "GO") || []
-    const successRate = tradeCount ? (successfulTrades.length / tradeCount) * 100 : 0
-
-    const [quoteProbe, expirationProbe] = await Promise.all([
-      probeYahooQuote("SPY"),
-      probeYahooExpirations("SPY"),
-    ])
-
-    const adapterDiagnostics = {
-      groq: {
-        status: process.env.GROQ_API_KEY ? "ok" : "not_configured",
-        configured: !!process.env.GROQ_API_KEY,
-      },
-      openai: {
-        status: process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY ? "ok" : "not_configured",
-        configured: !!process.env.OPENAI_API_KEY || !!process.env.AI_GATEWAY_API_KEY,
-      },
-      supabase: {
-        status: "ok",
-      },
-      yahoo: {
-        quote: quoteProbe,
-        expirations: expirationProbe,
-      },
-    }
-
-    const degraded = quoteProbe.status !== "ok" || expirationProbe.status !== "ok"
-
-    const engineStatus = {
-      status: degraded ? "degraded" : "operational",
-      reasonCode: degraded ? "YAHOO_PROBE_DEGRADED" : null,
-      lastActivity: recentTrades?.[0]?.created_at || null,
-      uptime: "100%",
-      metrics: {
-        tradesLast24h: tradeCount || 0,
-        receiptsLast24h: receiptCount || 0,
+        tradesLast24h: tradeCount,
+        receiptsLast24h: receiptCount,
         successRate: Math.round(successRate),
-        avgTrustScore: recentTrades?.length
+        avgTrustScore: recentTrades.length
           ? Math.round(recentTrades.reduce((sum, t) => sum + (t.trust_score || 0), 0) / recentTrades.length)
           : 0,
       },
@@ -211,10 +174,6 @@ export async function GET() {
       circuitBreakers: {
         yahooFinance: getMarketDataCircuitStatus(),
       },
-    }
-
-    return Response.json({
-      ...engineStatus,
       timestamp: new Date().toISOString(),
       latencyMs: Date.now() - startTime,
     })
