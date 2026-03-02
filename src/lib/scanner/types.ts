@@ -12,6 +12,7 @@ export interface ScanConfig {
 }
 
 export interface RawCandidate {
+  id: string
   ticker: string
   underlying_price: number
   strategy: Strategy
