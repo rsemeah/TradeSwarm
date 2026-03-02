@@ -1,5 +1,6 @@
 "use client"
 
+// Receipt drawer component for displaying trade proof bundles
 import { useState } from "react"
 import type { ProofBundle } from "@/lib/types/proof"
 import type { TradeScoringDetail } from "@/lib/types"
