@@ -8,11 +8,12 @@ interface LogoProps {
   className?: string
 }
 
-// Brand colors from the logo
+// TradeSwarm Brand Colors
 const BRAND = {
-  green: "#1B5E20",
-  gold: "#C5A028",
-  accent: "#00ff88",
+  green: "#1a5c3a",      // Forest green (primary)
+  gold: "#c9a227",       // Rich gold (accent)
+  bullish: "#22c55e",    // Signal green
+  bearish: "#ef4444",    // Signal red
 }
 
 export function Logo({ variant = "full", size = "md", className = "" }: LogoProps) {
@@ -136,13 +137,13 @@ function LogoIcon({ size = 36, className = "" }: { size?: number; className?: st
         opacity="0.8"
       />
       {/* Candlestick accents - left wing */}
-      <rect x="8" y="15" width="2" height="6" fill="#00ff88" rx="0.5" />
-      <rect x="12" y="14" width="2" height="8" fill="#ff4444" rx="0.5" />
-      <rect x="16" y="16" width="2" height="5" fill="#00ff88" rx="0.5" />
+      <rect x="8" y="15" width="2" height="6" fill={BRAND.bullish} rx="0.5" />
+      <rect x="12" y="14" width="2" height="8" fill={BRAND.bearish} rx="0.5" />
+      <rect x="16" y="16" width="2" height="5" fill={BRAND.bullish} rx="0.5" />
       {/* Candlestick accents - right wing */}
-      <rect x="54" y="15" width="2" height="6" fill="#00ff88" rx="0.5" />
-      <rect x="50" y="14" width="2" height="8" fill="#ff4444" rx="0.5" />
-      <rect x="46" y="16" width="2" height="5" fill="#00ff88" rx="0.5" />
+      <rect x="54" y="15" width="2" height="6" fill={BRAND.bullish} rx="0.5" />
+      <rect x="50" y="14" width="2" height="8" fill={BRAND.bearish} rx="0.5" />
+      <rect x="46" y="16" width="2" height="5" fill={BRAND.bullish} rx="0.5" />
     </svg>
   )
 }
@@ -238,9 +239,9 @@ export function LoadingLogo() {
         <span className="text-xl font-bold tracking-wide" style={{ color: BRAND.green }}>SWARM</span>
       </div>
       <div className="flex gap-1">
-        <span className="h-2 w-2 animate-bounce rounded-full bg-accent" style={{ animationDelay: "0ms" }} />
-        <span className="h-2 w-2 animate-bounce rounded-full bg-accent" style={{ animationDelay: "150ms" }} />
-        <span className="h-2 w-2 animate-bounce rounded-full bg-accent" style={{ animationDelay: "300ms" }} />
+        <span className="h-2 w-2 animate-bounce rounded-full" style={{ backgroundColor: BRAND.gold, animationDelay: "0ms" }} />
+        <span className="h-2 w-2 animate-bounce rounded-full" style={{ backgroundColor: BRAND.gold, animationDelay: "150ms" }} />
+        <span className="h-2 w-2 animate-bounce rounded-full" style={{ backgroundColor: BRAND.gold, animationDelay: "300ms" }} />
       </div>
     </div>
   )

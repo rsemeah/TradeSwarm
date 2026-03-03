@@ -1,6 +1,7 @@
 // Scanner types - canonical definitions for scan results and candidates
+
 export type Strategy = 'PCS' | 'CCS' | 'CDS'
-export type Tier = 'A' | 'B' | 'C'
+export type Tier = 'S' | 'A' | 'B' | 'C'
 export type Regime = 'TRENDING' | 'HIGH_VOL' | 'LOW_VOL' | 'CHOPPY' | 'MEAN_REVERT'
 
 export interface ScanConfig {
@@ -14,7 +15,6 @@ export interface ScanConfig {
 
 export interface RawCandidate {
   id: string
-  id?: string
   ticker: string
   underlying_price: number
   strategy: Strategy
@@ -80,19 +80,6 @@ export interface ScanResult {
   candidates_generated: number
   candidates_passed: number
   cache_hit: boolean
-  // Empty state fields (for when scan finds no candidates)
   empty?: boolean
   reason?: string
-  score: { display: string; value: number }
-  ror: number
-  contracts: number
-  stress?: unknown
-  truthSerum?: unknown
-  news: { macroFlags: string[] }
-}
-
-export interface ScanResult {
-  empty: boolean
-  reason?: string
-  deals: RankedDeal[]
 }

@@ -60,7 +60,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
                 suppressHydrationWarning
-                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
+                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#c9a227] focus:outline-none"
               />
             </div>
 
@@ -76,7 +76,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="current-password"
                 suppressHydrationWarning
-                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
+                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#c9a227] focus:outline-none"
               />
             </div>
 
@@ -89,7 +89,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 h-12 rounded-lg bg-[#00ff88] font-semibold text-[#0a0a0a] transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="mt-2 h-12 rounded-lg bg-[#c9a227] font-semibold text-[#0c0c0c] transition-all hover:bg-[#d4af37] disabled:opacity-50"
             >
               {isLoading ? "Signing in..." : "Sign In"}
             </button>
@@ -97,7 +97,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-[#6b6b6b]">
             Don&apos;t have an account?{" "}
-            <Link href="/auth/sign-up" className="text-[#00ff88] hover:underline">
+            <Link href="/auth/sign-up" className="text-[#c9a227] hover:underline">
               Sign up
             </Link>
           </p>

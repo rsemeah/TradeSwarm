@@ -3,19 +3,60 @@
 @tailwind utilities;
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #ffffff;
+  /* TradeSwarm Brand Palette */
+  /* Background: Deep charcoal/slate */
+  --background: #0c0c0c;
+  --foreground: #f5f5f5;
+  
+  /* Card: Slightly elevated surface */
   --card: #141414;
-  --card-foreground: #ffffff;
+  --card-foreground: #f5f5f5;
+  
+  /* Borders: Subtle separation */
   --border: #1f1f1f;
-  --muted: #141414;
-  --muted-foreground: #6b6b6b;
-  --accent: #00ff88;
-  --warning: #ffcc00;
-  --danger: #ff4444;
-  --primary: #00ff88;
-  --primary-foreground: #0a0a0a;
-  --radius: 10px;
+  --border-muted: #171717;
+  
+  /* Muted: Secondary text/surfaces */
+  --muted: #1a1a1a;
+  --muted-foreground: #737373;
+  
+  /* Primary: Forest Green (TradeSwarm brand) */
+  --primary: #1a5c3a;
+  --primary-foreground: #f5f5f5;
+  --primary-hover: #1f6b44;
+  
+  /* Accent: Gold/Amber (TradeSwarm brand) */
+  --accent: #c9a227;
+  --accent-foreground: #0c0c0c;
+  --accent-hover: #d4af37;
+  
+  /* Signal Colors */
+  --bullish: #22c55e;
+  --bearish: #ef4444;
+  --neutral: #737373;
+  
+  /* Status Colors */
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --success: #22c55e;
+  --info: #3b82f6;
+  
+  /* Tag Colors (from nav spec) */
+  --tag-broker: #3b82f6;
+  --tag-swarm: #22c55e;
+  --tag-truthserum: #a855f7;
+  --tag-calibration: #f59e0b;
+  --tag-ops: #6b7280;
+  --tag-account: #737373;
+  
+  /* Tier Colors */
+  --tier-s: #c9a227;
+  --tier-a: #22c55e;
+  --tier-b: #3b82f6;
+  --tier-c: #737373;
+  
+  /* Radius */
+  --radius: 8px;
 }
 
 * {
@@ -49,9 +90,16 @@ html {
   to { transform: rotate(360deg); }
 }
 
+/* Gold accent glow for primary actions */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(0, 255, 136, 0.6); }
+  0%, 100% { box-shadow: 0 0 20px rgba(201, 162, 39, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(201, 162, 39, 0.5); }
+}
+
+/* Green signal glow for bullish/go states */
+@keyframes pulse-glow-green {
+  0%, 100% { box-shadow: 0 0 20px rgba(34, 197, 94, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(34, 197, 94, 0.5); }
 }
 
 .animate-pulse-glow {

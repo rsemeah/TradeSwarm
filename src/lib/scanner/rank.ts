@@ -1,11 +1,11 @@
-import type { CandidateProofBundle, ScanResult } from '@/lib/types/proof-bundle'
+import type { CandidateProofBundle, ProofBundleScanResult } from '@/lib/types/proof-bundle'
 import type { FilterCounts } from './types'
 
 const TIER_MIN_ROR: Record<string, number> = { A: 0.1, B: 0.12, C: 0.15 }
 const MAX_PER_UNDERLYING = 3
 const TIER_TARGETS = { A: 5, B: 5, C: 4 }
 
-export function rankAndFilter(candidates: CandidateProofBundle[], catalyst_mode: boolean, filter_counts: FilterCounts): ScanResult['candidates'] {
+export function rankAndFilter(candidates: CandidateProofBundle[], catalyst_mode: boolean, filter_counts: FilterCounts): ProofBundleScanResult['candidates'] {
   let pool = candidates.filter((c) => {
     if (c.tier === 'A' && !catalyst_mode) {
       filter_counts.catalyst_mode_off = (filter_counts.catalyst_mode_off ?? 0) + 1
@@ -47,7 +47,7 @@ export function rankAndFilter(candidates: CandidateProofBundle[], catalyst_mode:
   return result
 }
 
-export function buildScanResult(scan_id: string, universe: string[], candidates: CandidateProofBundle[], filter_counts: FilterCounts, cached: boolean): ScanResult {
+export function buildScanResult(scan_id: string, universe: string[], candidates: CandidateProofBundle[], filter_counts: FilterCounts, cached: boolean): ProofBundleScanResult {
   const tier_counts = {
     A: candidates.filter((c) => c.tier === 'A').length,
     B: candidates.filter((c) => c.tier === 'B').length,

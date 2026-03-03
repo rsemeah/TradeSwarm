@@ -1,4 +1,4 @@
-import type { CandidateProofBundle, RegimeResult, ScanResult, SigmaSource } from '@/lib/types/proof-bundle'
+import type { CandidateProofBundle, RegimeResult, ProofBundleScanResult, SigmaSource } from '@/lib/types/proof-bundle'
 import { fetchHistoricalCloses, fetchOptionChain, fetchUnderlying } from '@/src/lib/adapters/optionsChain'
 import { computeRv20 } from '@/src/lib/indicators/rv20'
 import { getMacroFlags } from '@/src/lib/news/calendar'
@@ -22,7 +22,7 @@ const DEFAULT_REGIME: RegimeResult = { regime: 'CHOPPY', confidence: 0, source: 
 const TTL_MS = 5 * 60 * 1000
 
 // V1 note: process-memory cache only. Multi-instance inconsistency accepted in V1.
-const cache = new Map<string, { ts: number; payload: ScanResult }>()
+const cache = new Map<string, { ts: number; payload: ProofBundleScanResult }>()
 
 function getTargetExpiries(dte_range: [number, number]): string[] {
   const today = new Date()
@@ -268,7 +268,7 @@ export async function runFullScan(config: Partial<ScanConfig>): Promise<ScanResu
   return payload
 }
 
-export function getCachedScan(scanId: string): ScanResult | null {
+export function getCachedScan(scanId: string): ProofBundleScanResult | null {
   const hit = cache.get(`id:${scanId}`)
   if (!hit || Date.now() - hit.ts >= TTL_MS) return null
   return hit.payload

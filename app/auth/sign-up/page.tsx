@@ -78,7 +78,7 @@ export default function SignUpPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
                 suppressHydrationWarning
-                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
+                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#c9a227] focus:outline-none"
               />
             </div>
 
@@ -94,7 +94,7 @@ export default function SignUpPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
                 suppressHydrationWarning
-                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
+                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#c9a227] focus:outline-none"
               />
             </div>
 
@@ -110,7 +110,7 @@ export default function SignUpPage() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
                 suppressHydrationWarning
-                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
+                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#c9a227] focus:outline-none"
               />
             </div>
 
@@ -123,7 +123,7 @@ export default function SignUpPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 h-12 rounded-lg bg-[#00ff88] font-semibold text-[#0a0a0a] transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="mt-2 h-12 rounded-lg bg-[#c9a227] font-semibold text-[#0c0c0c] transition-all hover:bg-[#d4af37] disabled:opacity-50"
             >
               {isLoading ? "Creating account..." : "Create Account"}
             </button>
@@ -131,7 +131,7 @@ export default function SignUpPage() {
 
           <p className="mt-6 text-center text-sm text-[#6b6b6b]">
             Already have an account?{" "}
-            <Link href="/auth/login" className="text-[#00ff88] hover:underline">
+            <Link href="/auth/login" className="text-[#c9a227] hover:underline">
               Sign in
             </Link>
           </p>
