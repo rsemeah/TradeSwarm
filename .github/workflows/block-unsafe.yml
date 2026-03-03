@@ -1,0 +1,28 @@
+name: Safety Gate
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  block:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Prevent Unsafe Merge
+        run: |
+          set -euo pipefail
+
+          if rg -n "TODO: SAFETY_BYPASS" .; then
+            echo "Safety bypass detected"
+            exit 1
+          fi
+
+          if rg -n "determinism_hash" . | rg -v "computeDeterminismHash"; then
+            echo "Determinism referenced but not computed"
+            exit 1
+          fi

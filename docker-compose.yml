@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: tradeswarm
+      POSTGRES_PASSWORD: tradeswarm
+      POSTGRES_DB: tradeswarm
+    ports:
+      - "5432:5432"
+    volumes:
+      - tradeswarm_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tradeswarm -d tradeswarm"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  truthserum:
+    build:
+      context: ./services/truthserum-stub
+    ports:
+      - "8787:8787"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8787/health | grep -q 'ok'"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  # Optional if the app has a working Dockerfile.
+  # trade-app:
+  #   build:
+  #     context: .
+  #   environment:
+  #     DATABASE_URL: postgres://tradeswarm:tradeswarm@postgres:5432/tradeswarm
+  #     TRUTHSERUM_URL: http://truthserum:8787
+  #     NODE_ENV: development
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     truthserum:
+  #       condition: service_healthy
+
+volumes:
+  tradeswarm_pg:
