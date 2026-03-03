@@ -277,7 +277,7 @@ function AppContent() {
                             </span>
                             <span className="font-mono text-lg font-bold text-[#f5f5f5]">{candidate.ticker}</span>
                           </div>
-                          <p className="mt-1 text-xs text-[#737373]">{candidate.strategy} · {candidate.daysToExpiry} days</p>
+                          <p className="mt-1 text-xs text-[#737373]">{candidate.strategy}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] text-[#737373]">Trust Score</p>
