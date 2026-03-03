@@ -224,27 +224,36 @@ export function ReceiptDrawer({
             </>
           )}
 
-          {activeTab === "deliberation" && pb.modelRounds && (
+          {activeTab === "deliberation" && pb.deliberation && (
             <>
-              {pb.modelRounds.map((round, i) => (
-                <div key={i} className="overflow-hidden rounded-lg border border-border bg-background">
-                  <button
-                    onClick={() => setExpandedRound(expandedRound === i ? null : i)}
-                    className="flex w-full items-center justify-between p-3 text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-medium text-foreground">{round.model}</span>
-                      <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${verdictColor(round.decision)}`}>
-                        {round.decision}
-                      </span>
+              {pb.deliberation.map((round, i) => (
+                <div key={i} className="mb-3 overflow-hidden rounded-lg border border-border bg-background">
+                  <div className="border-b border-border bg-muted/30 px-3 py-2">
+                    <span className="text-[10px] font-bold uppercase text-muted-foreground">
+                      {round.stage} · {round.outcome.decision}
+                    </span>
+                  </div>
+                  {round.outputs.map((output, j) => (
+                    <div key={j} className="border-b border-border last:border-b-0">
+                      <button
+                        onClick={() => setExpandedRound(expandedRound === i * 10 + j ? null : i * 10 + j)}
+                        className="flex w-full items-center justify-between p-3 text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-medium text-foreground">{output.provider}</span>
+                          <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold ${verdictColor(output.decision)}`}>
+                            {output.decision}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">{output.confidence}%</span>
+                      </button>
+                      {expandedRound === i * 10 + j && (
+                        <div className="border-t border-border p-3">
+                          <p className="text-xs leading-relaxed text-foreground">{output.reasoning}</p>
+                        </div>
+                      )}
                     </div>
-                    <span className="text-[10px] text-muted-foreground">{round.confidence}%</span>
-                  </button>
-                  {expandedRound === i && (
-                    <div className="border-t border-border p-3">
-                      <p className="text-xs leading-relaxed text-foreground">{round.reasoning}</p>
-                    </div>
-                  )}
+                  ))}
                 </div>
               ))}
             </>
@@ -263,14 +272,10 @@ export function ReceiptDrawer({
                 <div className="rounded-lg border border-border bg-background p-3">
                   <p className="mb-2 text-[10px] font-bold uppercase text-muted-foreground">Score Factors</p>
                   <div className="space-y-1.5">
-                    {pb.scoring.factors.map((f, i) => (
-                      <div key={i} className="flex items-center justify-between text-[10px]">
-                        <span className="text-muted-foreground">{f.name}</span>
-                        <span className={`font-mono ${f.impact >= 0 ? "text-accent" : "text-danger"}`}>
-                          {f.impact >= 0 ? "+" : ""}{f.impact}
-                        </span>
-                      </div>
-                    ))}
+                    <FactorRow label="Model Agreement" value={pb.scoring.factors.modelAgreement * 100} />
+                    <FactorRow label="Provider Credibility" value={pb.scoring.factors.providerCredibility * 100} />
+                    <FactorRow label="Regime Alignment" value={pb.scoring.factors.regimeAlignmentBonus * 100} signed />
+                    <FactorRow label="Risk Penalty" value={pb.scoring.factors.riskPenalty * 100} signed />
                   </div>
                 </div>
               )}
