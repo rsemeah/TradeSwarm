@@ -95,7 +95,7 @@ function AppContent() {
             <div className="h-6 w-px bg-border" />
             <div>
               <p className="text-xs text-muted-foreground">Today</p>
-              <p className="font-mono text-sm font-medium text-accent">+{formatCurrency(mockPortfolio.dayPnl)}</p>
+              <p className="font-mono text-sm font-medium text-primary">+{formatCurrency(mockPortfolio.dayPnl)}</p>
             </div>
           </div>
           
@@ -328,7 +328,7 @@ function AppContent() {
                   <div className="rounded-lg border border-border bg-background p-4">
                     <p className="text-xs text-muted-foreground">Practice Balance</p>
                     <p className="font-mono text-3xl font-bold text-foreground">{formatCurrency(mockPortfolio.balance)}</p>
-                    <p className="font-mono text-lg text-accent">+{formatCurrency(mockPortfolio.dayPnl)}</p>
+                    <p className="font-mono text-lg text-primary">+{formatCurrency(mockPortfolio.dayPnl)}</p>
                   </div>
                   
                   <div className="rounded-lg border border-border bg-background p-4">
@@ -338,7 +338,7 @@ function AppContent() {
                       <span className="text-foreground">{mockPortfolio.drawdownPct}% used</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-accent" style={{ width: `${(mockPortfolio.drawdownPct / mockPortfolio.drawdownLimitPct) * 100}%` }} />
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${(mockPortfolio.drawdownPct / mockPortfolio.drawdownLimitPct) * 100}%` }} />
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground">{mockPortfolio.tradesToday} of {mockPortfolio.tradesTodayMax} trades today</p>
                   </div>
@@ -361,7 +361,7 @@ function AppContent() {
                     <h3 className="mb-2 text-sm font-semibold text-foreground">Road to Real Money</h3>
                     <p className="mb-2 text-xs text-muted-foreground">{mockPortfolio.paperTradesCompleted} / {mockPortfolio.paperTradesRequired} practice trades</p>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-accent" style={{ width: `${(mockPortfolio.paperTradesCompleted / mockPortfolio.paperTradesRequired) * 100}%` }} />
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${(mockPortfolio.paperTradesCompleted / mockPortfolio.paperTradesRequired) * 100}%` }} />
                     </div>
                   </div>
                 </div>

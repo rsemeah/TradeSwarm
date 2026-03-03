@@ -54,8 +54,8 @@ export function RadarScreen({ onNavigateToTrades }: RadarScreenProps) {
 
       {/* Notification */}
       {notification && (
-        <div className="rounded-lg bg-accent/10 border border-accent/30 px-3 py-2.5">
-          <p className="text-sm text-accent">{notification}</p>
+        <div className="rounded-lg bg-primary/10 border border-primary/30 px-3 py-2.5">
+          <p className="text-sm text-primary">{notification}</p>
         </div>
       )}
 
@@ -95,9 +95,9 @@ export function RadarScreen({ onNavigateToTrades }: RadarScreenProps) {
               Groq + OpenAI consensus engine
             </p>
             <div className="mt-4 flex justify-center gap-1">
-              <div className="h-1.5 w-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "0ms" }} />
-              <div className="h-1.5 w-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "150ms" }} />
-              <div className="h-1.5 w-1.5 rounded-full bg-accent animate-bounce" style={{ animationDelay: "300ms" }} />
+              <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }} />
+              <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }} />
+              <div className="h-1.5 w-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }} />
             </div>
           </div>
         </div>

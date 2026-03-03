@@ -26,7 +26,7 @@ interface ReceiptDrawerProps {
 type TabId = "summary" | "regime" | "risk" | "deliberation" | "scoring"
 
 function verdictColor(v: string) {
-  if (v === "GO") return "bg-accent/20 text-accent"
+  if (v === "GO") return "bg-primary/20 text-primary"
   if (v === "WAIT") return "bg-warning/20 text-warning"
   return "bg-danger/20 text-danger"
 }
@@ -35,7 +35,7 @@ function ScoreBar({ value, max = 100 }: { value: number; max?: number }) {
   const pct = Math.max(0, Math.min(100, (value / max) * 100))
   return (
     <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-      <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
+      <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
     </div>
   )
 }
@@ -90,7 +90,7 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
               </p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="font-mono text-xl font-bold text-accent">${pb.finalDecision.recommendedAmount?.toLocaleString() ?? "—"}</p>
+              <p className="font-mono text-xl font-bold text-primary">${pb.finalDecision.recommendedAmount?.toLocaleString() ?? "—"}</p>
               <p className="text-[10px] text-muted-foreground">recommended</p>
             </div>
           </div>

@@ -3,19 +3,30 @@
 @tailwind utilities;
 
 :root {
+  /* ── Shell ───────────────────────────────────────────────────── */
   --background: #0a0a0a;
-  --foreground: #ffffff;
-  --card: #141414;
-  --card-foreground: #ffffff;
+  --foreground: #f2f2f2;
+  --card: #111111;
+  --card-foreground: #f2f2f2;
   --border: #1f1f1f;
-  --muted: #141414;
+  --muted: #111111;
   --muted-foreground: #6b6b6b;
-  --accent: #00ff88;
-  --warning: #ffcc00;
-  --danger: #ff4444;
-  --primary: #00ff88;
-  --primary-foreground: #0a0a0a;
   --radius: 10px;
+
+  /* ── Forest green — trade direction / performance / GO ────────── */
+  --primary: #1f9d73;
+  --primary-hover: #137a57;
+  --primary-active: #0e5f43;
+  --primary-foreground: #f2f2f2;
+
+  /* ── Champagne gold — system / governance / institutional ─────── */
+  --accent: #c6a75e;
+  --accent-hover: #e1c27a;
+  --accent-foreground: #0a0a0a;
+
+  /* ── Risk ────────────────────────────────────────────────────── */
+  --warning: #b8860b;
+  --danger: #8b0000;
 }
 
 * {
@@ -49,14 +60,6 @@ html {
   to { transform: rotate(360deg); }
 }
 
-@keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.3); }
-  50% { box-shadow: 0 0 40px rgba(0, 255, 136, 0.6); }
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
 
 @keyframes slideUp {
   from { transform: translateY(100%); }

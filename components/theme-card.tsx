@@ -11,7 +11,7 @@ interface ThemeCardProps {
 
 function HeatBadge({ heat }: { heat: Theme["heat"] }) {
   const config = {
-    hot: { bg: "bg-accent", text: "text-background", label: "Hot", icon: "\uD83D\uDD25" },
+    hot: { bg: "bg-primary", text: "text-primary-foreground", label: "Hot", icon: "\uD83D\uDD25" },
     warming: { bg: "bg-warning", text: "text-background", label: "Warming", icon: "\uD83D\uDCC8" },
     quiet: { bg: "bg-muted", text: "text-muted-foreground", label: "Quiet", icon: "\uD83D\uDE34" },
   }
@@ -63,7 +63,7 @@ export function ThemeCard({ theme, onSeeTrade, onWatch }: ThemeCardProps) {
         <button
           onClick={onSeeTrade}
           disabled={isAnalyzing}
-          className="flex-1 rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isAnalyzing ? "Analyzing..." : "See Best Trade →"}
         </button>
