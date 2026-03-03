@@ -60,10 +60,10 @@ export function TradesScreen({ aiCandidate }: TradesScreenProps) {
       {notification && (
         <div className={`rounded-lg px-3 py-2.5 ${
           state.lastResult?.success 
-            ? "bg-accent/10 border border-accent/30" 
+            ? "bg-primary/10 border border-primary/30"
             : "bg-danger/10 border border-danger/30"
         }`}>
-          <p className={`text-sm ${state.lastResult?.success ? "text-accent" : "text-danger"}`}>
+          <p className={`text-sm ${state.lastResult?.success ? "text-primary" : "text-danger"}`}>
             {notification}
           </p>
           {state.lastResult?.reasonCode && (
@@ -76,8 +76,8 @@ export function TradesScreen({ aiCandidate }: TradesScreenProps) {
 
       {/* AI Badge if we have an AI-analyzed trade */}
       {aiCandidate && (
-        <div className="rounded-lg bg-accent/5 border border-accent/20 px-3 py-2">
-          <p className="text-xs text-accent">
+        <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2">
+          <p className="text-xs text-primary">
             AI Swarm Analysis Complete - Groq + OpenAI + Claude
           </p>
         </div>

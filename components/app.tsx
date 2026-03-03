@@ -79,7 +79,10 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="min-h-screen p-4">
+      {/* DESKTOP SHELL — must stay hidden below lg. Rendering both shells simultaneously
+           pushes mobile tab content off-screen and makes tabs appear non-functional.
+           Rule: desktop shell = hidden lg:block | mobile shell = lg:hidden — never relax either. */}
+      <main className="hidden lg:block min-h-screen p-4">
         {/* Top Navigation Bar */}
         <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-card/70 px-4 py-3">
           <div className="flex items-center gap-4">
@@ -92,7 +95,7 @@ function AppContent() {
             <div className="h-6 w-px bg-border" />
             <div>
               <p className="text-xs text-muted-foreground">Today</p>
-              <p className="font-mono text-sm font-medium text-accent">+{formatCurrency(mockPortfolio.dayPnl)}</p>
+              <p className="font-mono text-sm font-medium text-primary">+{formatCurrency(mockPortfolio.dayPnl)}</p>
             </div>
           </div>
           
@@ -325,7 +328,7 @@ function AppContent() {
                   <div className="rounded-lg border border-border bg-background p-4">
                     <p className="text-xs text-muted-foreground">Practice Balance</p>
                     <p className="font-mono text-3xl font-bold text-foreground">{formatCurrency(mockPortfolio.balance)}</p>
-                    <p className="font-mono text-lg text-accent">+{formatCurrency(mockPortfolio.dayPnl)}</p>
+                    <p className="font-mono text-lg text-primary">+{formatCurrency(mockPortfolio.dayPnl)}</p>
                   </div>
                   
                   <div className="rounded-lg border border-border bg-background p-4">
@@ -335,7 +338,7 @@ function AppContent() {
                       <span className="text-foreground">{mockPortfolio.drawdownPct}% used</span>
                     </div>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-accent" style={{ width: `${(mockPortfolio.drawdownPct / mockPortfolio.drawdownLimitPct) * 100}%` }} />
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${(mockPortfolio.drawdownPct / mockPortfolio.drawdownLimitPct) * 100}%` }} />
                     </div>
                     <p className="mt-2 text-xs text-muted-foreground">{mockPortfolio.tradesToday} of {mockPortfolio.tradesTodayMax} trades today</p>
                   </div>
@@ -358,7 +361,7 @@ function AppContent() {
                     <h3 className="mb-2 text-sm font-semibold text-foreground">Road to Real Money</h3>
                     <p className="mb-2 text-xs text-muted-foreground">{mockPortfolio.paperTradesCompleted} / {mockPortfolio.paperTradesRequired} practice trades</p>
                     <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                      <div className="h-full rounded-full bg-accent" style={{ width: `${(mockPortfolio.paperTradesCompleted / mockPortfolio.paperTradesRequired) * 100}%` }} />
+                      <div className="h-full rounded-full bg-primary" style={{ width: `${(mockPortfolio.paperTradesCompleted / mockPortfolio.paperTradesRequired) * 100}%` }} />
                     </div>
                   </div>
                 </div>
@@ -436,6 +439,9 @@ function AppContent() {
         </div>
       </main>
 
+      {/* MOBILE SHELL — must stay lg:hidden. pb-24 clears the fixed TabBar (~64px).
+           Paper mode badge sits at bottom-16 (64px) in the safe zone above TabBar.
+           Rule: only activeTab controls screen render — do not add extra conditional wrappers here. */}
       <div className="lg:hidden">
         <main className="mx-auto max-w-[420px] px-4 pb-24 pt-6">
           {activeTab === "radar" && <RadarScreen onNavigateToTrades={handleNavigateToTrades} />}
