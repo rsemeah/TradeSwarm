@@ -1,0 +1,9 @@
+{
+  "name": "truthserum-stub",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
