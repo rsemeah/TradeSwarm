@@ -1,5 +1,6 @@
 "use client"
 
+// TradeSwarm Main App Shell - Desktop (8-group nav) + Mobile (3-tab) layouts
 import { Suspense, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import type { TabId, TradeCandidate } from "@/lib/types"
