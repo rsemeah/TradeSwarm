@@ -18,7 +18,8 @@
   file (gitignored) or a secrets manager (e.g., Doppler, 1Password CLI,
   `direnv`).
 - The `.env` file is listed in `.gitignore` and must not be committed.
-- Tasks that require API credentials (e.g., `GROQ_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`)
+- Tasks that require API credentials (e.g., `GROQ_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `AI_GATEWAY_API_KEY`, `INTERNAL_JOBS_TOKEN`)
   must read from environment variables only. Example pattern:
 
   ```jsonc
@@ -119,12 +120,12 @@ To run either task: open the VS Code Command Palette (`Ctrl+Shift+P` /
 
 ### Token rotation schedule
 
-| Secret | Recommended rotation | Owner |
-|---|---|---|
-| `GROQ_API_KEY` | 90 days | Platform lead |
-| `SUPABASE_SERVICE_ROLE_KEY` | 90 days | Platform lead |
-| `INTERNAL_JOBS_TOKEN` | 30 days | Ops |
-| `AI_GATEWAY_API_KEY` | 90 days | Platform lead |
+| Secret | Purpose | Recommended rotation | Owner |
+|---|---|---|---|
+| `GROQ_API_KEY` | Default model provider (Groq LLM API) | 90 days | Platform lead |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role DB access | 90 days | Platform lead |
+| `AI_GATEWAY_API_KEY` | Optional OpenAI gateway path | 90 days | Platform lead |
+| `INTERNAL_JOBS_TOKEN` | Protects internal cron/ops routes | 30 days | Ops |
 
 ## 6. Security and Legal Review Requirement
 
