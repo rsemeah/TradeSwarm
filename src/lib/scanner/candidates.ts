@@ -1,7 +1,7 @@
 import type { OptionContract } from '@/src/lib/adapters/optionsChain'
 import type { RawCandidate, Tier } from './types'
 
-const DTE_TIERS: Record<Tier, [number, number]> = { A: [3, 7], B: [10, 21], C: [21, 30] }
+const DTE_TIERS: Record<Tier, [number, number]> = { S: [0, 3], A: [3, 7], B: [10, 21], C: [21, 30] }
 const CREDIT_SHORT_DELTA_MIN = 0.25
 const CREDIT_SHORT_DELTA_MAX = 0.35
 const DEBIT_LONG_DELTA_MIN = 0.45
