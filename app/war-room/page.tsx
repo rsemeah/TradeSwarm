@@ -373,7 +373,7 @@ export default function WarRoomPage() {
         {loading ? (
           <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
             <div className="flex flex-col items-center gap-4">
-              <Logo size="lg" animate />
+              <Logo size="lg" />
               <p className="text-sm text-[var(--text-muted)]">Loading War Room...</p>
             </div>
           </div>
