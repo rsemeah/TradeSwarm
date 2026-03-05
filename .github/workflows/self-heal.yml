@@ -54,6 +54,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Remove untracked files before Codex commit
+        run: git clean -fd
+
       - name: Run Codex Auto-Fix
         uses: openai/codex-action@v1
         with:
