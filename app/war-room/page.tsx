@@ -233,7 +233,7 @@ export default function WarRoomPage() {
       <aside className={`hidden lg:flex flex-col w-[188px] bg-[var(--bg-surface)] border-r border-[var(--border-subtle)]`}>
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 border-b border-[var(--border-subtle)] px-4">
-          <Logo size={28} />
+          <Logo size="sm" />
           <span className="text-sm font-semibold tracking-tight">
             <span className="text-[var(--green-500)]">TRADE</span>
             <span className="text-[var(--gold-400)]">SWARM</span>
@@ -304,7 +304,7 @@ export default function WarRoomPage() {
       {/* Mobile Header */}
       <div className="fixed left-0 right-0 top-0 z-50 flex h-14 items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 lg:hidden">
         <div className="flex items-center gap-2">
-          <Logo size={24} />
+          <Logo size="xs" />
           <span className="text-sm font-semibold">
             <span className="text-[var(--green-500)]">TRADE</span>
             <span className="text-[var(--gold-400)]">SWARM</span>
@@ -373,7 +373,7 @@ export default function WarRoomPage() {
         {loading ? (
           <div className="flex h-[calc(100vh-3.5rem)] items-center justify-center">
             <div className="flex flex-col items-center gap-4">
-              <Logo size={48} animate />
+              <Logo size="lg" animate />
               <p className="text-sm text-[var(--text-muted)]">Loading War Room...</p>
             </div>
           </div>
