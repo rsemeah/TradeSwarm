@@ -8,9 +8,10 @@ import type { TradeCandidate } from "@/lib/types"
 
 interface TradesScreenProps {
   aiCandidate?: TradeCandidate | null
+  onBack?: () => void
 }
 
-export function TradesScreen({ aiCandidate }: TradesScreenProps) {
+export function TradesScreen({ aiCandidate, onBack }: TradesScreenProps) {
   const { state } = useTrade()
   const [notification, setNotification] = useState<string | null>(null)
   
@@ -31,6 +32,17 @@ export function TradesScreen({ aiCandidate }: TradesScreenProps) {
   if (!hasGoTrades) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="absolute left-4 top-6 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Radar
+          </button>
+        )}
         <div className="mb-4 text-6xl">-</div>
         <h2 className="mb-2 text-base font-medium text-foreground">Sitting out today</h2>
         <p className="mb-4 max-w-[280px] text-[13px] text-muted-foreground leading-relaxed">
@@ -50,6 +62,17 @@ export function TradesScreen({ aiCandidate }: TradesScreenProps) {
     <div className="space-y-4">
       {/* Header */}
       <div className="mb-2">
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Radar
+          </button>
+        )}
         <h1 className="text-lg font-bold text-foreground">Today&apos;s Trades</h1>
         <p className="text-xs text-muted-foreground">
           Based on AI Infrastructure - Scanned {mockRadarData.lastScan}
