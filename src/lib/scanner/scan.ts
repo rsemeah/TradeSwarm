@@ -49,7 +49,7 @@ async function detectRegimeSafe(ticker: string): Promise<RegimeResult> {
   }
 }
 
-export async function runFullScan(config: Partial<ScanConfig>): Promise<ScanResult> {
+export async function runFullScan(config: Partial<ScanConfig>): Promise<ProofBundleScanResult> {
   const cfg: ScanConfig = {
     watchlist: config.watchlist ?? [],
     catalyst_mode: config.catalyst_mode ?? false,
