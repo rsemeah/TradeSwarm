@@ -439,8 +439,8 @@ function AppContent() {
       <div className="lg:hidden">
         <main className="mx-auto max-w-[420px] px-4 pb-24 pt-6">
           {activeTab === "radar" && <RadarScreen onNavigateToTrades={handleNavigateToTrades} />}
-          {activeTab === "trades" && <TradesScreen aiCandidate={aiCandidate} />}
-          {activeTab === "money" && <MoneyScreen />}
+          {activeTab === "trades" && <TradesScreen aiCandidate={aiCandidate} onBack={() => setActiveTab("radar")} />}
+          {activeTab === "money" && <MoneyScreen onBack={() => setActiveTab("radar")} />}
         </main>
 
         <div className="fixed bottom-16 left-0 right-0 flex justify-center gap-2 py-2">

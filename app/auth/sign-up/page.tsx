@@ -54,6 +54,15 @@ export default function SignUpPage() {
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-[#0a0a0a] p-6">
       <div className="w-full max-w-[380px]">
+        <Link
+          href="/auth/login"
+          className="mb-6 flex items-center gap-1.5 text-xs text-[#6b6b6b] hover:text-white transition-colors"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Sign In
+        </Link>
         <div className="mb-8 flex flex-col items-center">
           <Logo variant="icon" size="xl" />
           <div className="mt-3 text-lg font-bold tracking-wide">
