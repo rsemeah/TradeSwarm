@@ -1,9 +1,9 @@
 import type { CandidateProofBundle, ProofBundleScanResult } from '@/lib/types/proof-bundle'
 import type { FilterCounts } from './types'
 
-const TIER_MIN_ROR: Record<string, number> = { A: 0.1, B: 0.12, C: 0.15 }
+const TIER_MIN_ROR: Record<string, number> = { S: 0.08, A: 0.1, B: 0.12, C: 0.15 }
 const MAX_PER_UNDERLYING = 3
-const TIER_TARGETS = { A: 5, B: 5, C: 4 }
+const TIER_TARGETS: Record<string, number> = { S: 3, A: 5, B: 5, C: 4 }
 
 export function rankAndFilter(candidates: CandidateProofBundle[], catalyst_mode: boolean, filter_counts: FilterCounts): ProofBundleScanResult['candidates'] {
   let pool = candidates.filter((c) => {
@@ -36,7 +36,7 @@ export function rankAndFilter(candidates: CandidateProofBundle[], catalyst_mode:
   })
 
   const result: CandidateProofBundle[] = []
-  const tier_taken: Record<string, number> = { A: 0, B: 0, C: 0 }
+  const tier_taken: Record<string, number> = { S: 0, A: 0, B: 0, C: 0 }
   for (const c of pool) {
     const target = TIER_TARGETS[c.tier] ?? 0
     if (tier_taken[c.tier] < target) {
