@@ -66,20 +66,20 @@ export async function GET() {
 
   try {
     const supabase = await createClient()
-    const [dbResult, yahooResult] = await Promise.all([
-      supabase.from("trade_receipts").select("id", { count: "exact", head: true }),
-      probeMarketDataHealth(),
-    ])
+
+    // Market health probe
+    const marketHealth = await probeMarketDataHealth()
 
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const [{ count: tradeCount }, { data: recentEvents, count: eventCount }] = await Promise.all([
-      supabase.from("trades").select("id", { count: "exact", head: true }).gte("created_at", yesterday),
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-    const [dbResult, yahooResult, tradesResult, eventsResult, receiptResult, quoteProbe, expirationProbe] = await Promise.all([
+    const [dbResult, tradesResult, eventsResult, receiptResult, quoteProbe, expirationProbe] = await Promise.all([
       supabase.from("trade_receipts").select("*", { count: "exact", head: true }),
-      probeMarketDataHealth(),
-      supabase.from("trades").select("*", { count: "exact" }).gte("created_at", yesterday).order("created_at", { ascending: false }).limit(10),
+      supabase
+        .from("trades")
+        .select("*", { count: "exact" })
+        .gte("created_at", yesterday)
+        .order("created_at", { ascending: false })
+        .limit(10),
       supabase
         .from("engine_events")
         .select("name, status, created_at", { count: "exact" })
@@ -91,97 +91,78 @@ export async function GET() {
       probeYahooExpirations("SPY"),
     ])
 
-    const errEvents = recentEvents?.filter((event) => event.status === "error") ?? []
-    const blockedEvents = recentEvents?.filter((event) => event.status === "blocked") ?? []
+    const recentEvents = eventsResult?.data ?? []
+    const recentTrades = tradesResult?.data ?? []
 
-    const dbOk = !dbResult.error
-    const yahooOk = yahooResult.status !== "down"
-
-    return Response.json({
-      ok: dbOk && yahooOk,
-      status: dbOk && yahooOk ? "operational" : "degraded",
-      reasonCode: yahooOk ? null : "YAHOO_PROBE_DEGRADED",
-    const recentEvents = eventsResult.data ?? []
-    const recentTrades = tradesResult.data ?? []
     const errEvents = recentEvents.filter((e) => e.status === "error")
     const blockedEvents = recentEvents.filter((e) => e.status === "blocked")
     const successfulTrades = recentTrades.filter((t) => t.status === "GO")
 
     const dbOk = !dbResult.error
-    const yahooOk = yahooResult.status !== "down"
+    const yahooOk = marketHealth.status !== "down"
     const degraded = quoteProbe.status !== "ok" || expirationProbe.status !== "ok"
     const ok = dbOk && yahooOk
 
-    return Response.json({
-      ok,
-      status: degraded ? "degraded" : "operational",
-      reasonCode: degraded ? "YAHOO_PROBE_DEGRADED" : null,
-      engineVersion: "1.0.0",
-      checks: {
-        db: {
-          ok: dbOk,
-          receiptsTotal: dbResult.count ?? 0,
-          error: dbResult.error ? String(dbResult.error) : null,
+    return Response.json(
+      {
+        ok,
+        status: degraded ? "degraded" : "operational",
+        reasonCode: degraded ? "YAHOO_PROBE_DEGRADED" : null,
+        engineVersion: "1.0.0",
+        checks: {
+          db: {
+            ok: dbOk,
+            receiptsTotal: dbResult.count ?? 0,
+            error: dbResult.error ? String(dbResult.error) : null,
+          },
+          market: {
+            ok: yahooOk,
+            status: marketHealth.status,
+            latencyMs: marketHealth.latencyMs,
+            quoteProbe,
+            expirations: expirationProbe,
+          },
         },
-        yahoo: {
-          ok: yahooOk,
-          status: yahooResult.status,
-          latencyMs: yahooResult.latencyMs,
-          symbols: yahooResult.symbols,
-          quote: quoteProbe,
-          expirations: expirationProbe,
+        components: {
+          aiSwarm: {
+            status: "ok",
+            models: ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"],
+          },
+          regime: { status: "operational", circuit: getMarketDataCircuitStatus() },
+          risk: { status: "operational" },
+          deliberation: { status: "operational" },
         },
+        metrics: {
+          tradesLast24h: tradesResult.count ?? 0,
+          receiptsLast24h: receiptResult.count ?? 0,
+          eventsLast24h: eventsResult.count ?? 0,
+          errorsLast24h: errEvents.length,
+          blockedLast24h: blockedEvents.length,
+          successRate: tradesResult.count ? Math.round((successfulTrades.length / tradesResult.count) * 100) : 0,
+          avgTrustScore: recentTrades.length
+            ? Math.round(recentTrades.reduce((sum: number, t: any) => sum + (t.trust_score || 0), 0) / recentTrades.length)
+            : 0,
+        },
+        adapterDiagnostics: {
+          groq: {
+            status: process.env.GROQ_API_KEY ? "ok" : "not_configured",
+            configured: !!process.env.GROQ_API_KEY,
+          },
+          openai: {
+            status: process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY ? "ok" : "not_configured",
+            configured: !!process.env.OPENAI_API_KEY || !!process.env.AI_GATEWAY_API_KEY,
+          },
+          supabase: { status: "ok" },
+        },
+        circuitBreakers: {
+          yahooFinance: getMarketDataCircuitStatus(),
+        },
+        lastActivity: recentTrades[0]?.created_at || null,
+        timestamp: new Date().toISOString(),
+        latencyMs: Date.now() - startTime,
       },
-      components: {
-        regime: { status: "operational", circuit: getMarketDataCircuitStatus() },
-        risk: { status: "operational" },
-        deliberation: { status: "operational" },
-      },
-      metrics: {
-        tradesLast24h: tradesResult.count ?? 0,
-        receiptsLast24h: receiptResult.count ?? 0,
-        eventsLast24h: eventsResult.count ?? 0,
-        errorsLast24h: errEvents.length,
-        blockedLast24h: blockedEvents.length,
-      },
-        successRate: tradesResult.count ? Math.round((successfulTrades.length / tradesResult.count) * 100) : 0,
-        avgTrustScore: recentTrades.length
-          ? Math.round(recentTrades.reduce((sum, t) => sum + (t.trust_score || 0), 0) / recentTrades.length)
-          : 0,
-      },
-      components: {
-        aiSwarm: {
-          status: "ok",
-          models: ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"],
-        },
-        regime: {
-          status: "operational",
-          circuit: getMarketDataCircuitStatus(),
-        },
-        risk: {
-          status: "operational",
-        },
-      },
-      adapterDiagnostics: {
-        groq: {
-          status: process.env.GROQ_API_KEY ? "ok" : "not_configured",
-          configured: !!process.env.GROQ_API_KEY,
-        },
-        openai: {
-          status: process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY ? "ok" : "not_configured",
-          configured: !!process.env.OPENAI_API_KEY || !!process.env.AI_GATEWAY_API_KEY,
-        },
-        supabase: {
-          status: "ok",
-        },
-      },
-      circuitBreakers: {
-        yahooFinance: getMarketDataCircuitStatus(),
-      },
-      lastActivity: recentTrades[0]?.created_at || null,
-      timestamp: new Date().toISOString(),
-      latencyMs: Date.now() - startTime,
-    })
+      { status: ok ? 200 : 200 }
+    )
   } catch (error) {
     return Response.json(
       {

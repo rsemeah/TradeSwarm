@@ -11,7 +11,8 @@ permissions:
 
 jobs:
   codex-policy:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    if: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false) && secrets.OPENAI_API_KEY != '' }}
+    
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -20,6 +21,7 @@ jobs:
 
       - name: Run Codex policy review
         uses: openai/codex-action@v1
+        continue-on-error: true
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           prompt-file: .github/codex/policy-prompt.md

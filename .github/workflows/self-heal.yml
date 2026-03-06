@@ -11,7 +11,7 @@ permissions:
 jobs:
   stabilize:
     if: github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
-    runs-on: ubuntu-latest
+      runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
@@ -29,11 +29,14 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Install
-        run: pnpm install --frozen-lockfile
+        - name: Install
+          run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
+        - name: Install ripgrep
+          run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+        - name: Lint
+          run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
@@ -46,8 +49,8 @@ jobs:
 
   auto-fix:
     needs: stabilize
-    if: failure() && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
-    runs-on: ubuntu-latest
+    if: ${{ failure() && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze') && secrets.OPENAI_API_KEY != '' }}
+      runs-on: ubuntu-latest
     timeout-minutes: 20
 
     steps:
@@ -81,7 +84,7 @@ jobs:
   auto-merge:
     needs: stabilize
     if: success() && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
-    runs-on: ubuntu-latest
+      runs-on: ubuntu-latest
 
     steps:
       - name: Enable Auto Merge
