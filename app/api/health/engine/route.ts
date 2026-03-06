@@ -66,57 +66,38 @@ export async function GET() {
 
   try {
     const supabase = await createClient()
-    const [dbResult, yahooResult] = await Promise.all([
-      supabase.from("trade_receipts").select("id", { count: "exact", head: true }),
-      probeMarketDataHealth(),
-    ])
-
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const [{ count: tradeCount }, { data: recentEvents, count: eventCount }] = await Promise.all([
-      supabase.from("trades").select("id", { count: "exact", head: true }).gte("created_at", yesterday),
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-    const [dbResult, yahooResult, tradesResult, eventsResult, receiptResult, quoteProbe, expirationProbe] = await Promise.all([
+    // Run all probes in parallel
+    const [dbResult, yahooResult, tradesResult, receiptsResult, quoteProbe, expirationProbe] = await Promise.all([
       supabase.from("trade_receipts").select("*", { count: "exact", head: true }),
       probeMarketDataHealth(),
       supabase.from("trades").select("*", { count: "exact" }).gte("created_at", yesterday).order("created_at", { ascending: false }).limit(10),
-      supabase
-        .from("engine_events")
-        .select("name, status, created_at", { count: "exact" })
-        .gte("created_at", yesterday)
-        .order("created_at", { ascending: false })
-        .limit(50),
       supabase.from("trade_receipts").select("*", { count: "exact", head: true }).gte("created_at", yesterday),
       probeYahooQuote("SPY"),
       probeYahooExpirations("SPY"),
     ])
 
-    const errEvents = recentEvents?.filter((event) => event.status === "error") ?? []
-    const blockedEvents = recentEvents?.filter((event) => event.status === "blocked") ?? []
-
-    const dbOk = !dbResult.error
-    const yahooOk = yahooResult.status !== "down"
-
-    return Response.json({
-      ok: dbOk && yahooOk,
-      status: dbOk && yahooOk ? "operational" : "degraded",
-      reasonCode: yahooOk ? null : "YAHOO_PROBE_DEGRADED",
-    const recentEvents = eventsResult.data ?? []
-    const recentTrades = tradesResult.data ?? []
-    const errEvents = recentEvents.filter((e) => e.status === "error")
-    const blockedEvents = recentEvents.filter((e) => e.status === "blocked")
+    const recentTrades = tradesResult.data || []
+    const tradeCount = tradesResult.count || 0
+    const receiptCount = receiptsResult.count || 0
     const successfulTrades = recentTrades.filter((t) => t.status === "GO")
+    const successRate = tradeCount ? (successfulTrades.length / tradeCount) * 100 : 0
 
     const dbOk = !dbResult.error
-    const yahooOk = yahooResult.status !== "down"
+    const yahooOk = yahooResult.status !== "down" && quoteProbe.status === "ok"
     const degraded = quoteProbe.status !== "ok" || expirationProbe.status !== "ok"
-    const ok = dbOk && yahooOk
 
     return Response.json({
-      ok,
+      // Locked contract fields (MUST be present)
+      ok: dbOk && yahooOk,
+      service: "engine",
+      ts: new Date().toISOString(),
+      // Extended fields
       status: degraded ? "degraded" : "operational",
-      reasonCode: degraded ? "YAHOO_PROBE_DEGRADED" : null,
       engineVersion: "1.0.0",
+      reasonCode: degraded ? "YAHOO_PROBE_DEGRADED" : null,
+      lastActivity: recentTrades[0]?.created_at || null,
       checks: {
         db: {
           ok: dbOk,
@@ -127,7 +108,6 @@ export async function GET() {
           ok: yahooOk,
           status: yahooResult.status,
           latencyMs: yahooResult.latencyMs,
-          symbols: yahooResult.symbols,
           quote: quoteProbe,
           expirations: expirationProbe,
         },
@@ -136,31 +116,18 @@ export async function GET() {
         regime: { status: "operational", circuit: getMarketDataCircuitStatus() },
         risk: { status: "operational" },
         deliberation: { status: "operational" },
-      },
-      metrics: {
-        tradesLast24h: tradesResult.count ?? 0,
-        receiptsLast24h: receiptResult.count ?? 0,
-        eventsLast24h: eventsResult.count ?? 0,
-        errorsLast24h: errEvents.length,
-        blockedLast24h: blockedEvents.length,
-      },
-        successRate: tradesResult.count ? Math.round((successfulTrades.length / tradesResult.count) * 100) : 0,
-        avgTrustScore: recentTrades.length
-          ? Math.round(recentTrades.reduce((sum, t) => sum + (t.trust_score || 0), 0) / recentTrades.length)
-          : 0,
-      },
-      components: {
         aiSwarm: {
           status: "ok",
           models: ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"],
         },
-        regime: {
-          status: "operational",
-          circuit: getMarketDataCircuitStatus(),
-        },
-        risk: {
-          status: "operational",
-        },
+      },
+      metrics: {
+        tradesLast24h: tradeCount,
+        receiptsLast24h: receiptCount,
+        successRate: Math.round(successRate),
+        avgTrustScore: recentTrades.length
+          ? Math.round(recentTrades.reduce((sum, t) => sum + (t.trust_score || 0), 0) / recentTrades.length)
+          : 0,
       },
       adapterDiagnostics: {
         groq: {
@@ -171,25 +138,22 @@ export async function GET() {
           status: process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY ? "ok" : "not_configured",
           configured: !!process.env.OPENAI_API_KEY || !!process.env.AI_GATEWAY_API_KEY,
         },
-        supabase: {
-          status: "ok",
-        },
+        supabase: { status: dbOk ? "ok" : "error" },
       },
       circuitBreakers: {
         yahooFinance: getMarketDataCircuitStatus(),
       },
-      lastActivity: recentTrades[0]?.created_at || null,
-      timestamp: new Date().toISOString(),
       latencyMs: Date.now() - startTime,
     })
   } catch (error) {
     return Response.json(
       {
         ok: false,
+        service: "engine",
+        ts: new Date().toISOString(),
         status: "error",
         reasonCode: "ENGINE_HEALTH_FAILED",
         error: String(error),
-        timestamp: new Date().toISOString(),
         latencyMs: Date.now() - startTime,
       },
       { status: 500 }

@@ -39,45 +39,45 @@ export default function LoginPage() {
         <div className="mb-8 flex flex-col items-center">
           <Logo variant="icon" size="xl" />
           <div className="mt-3 text-lg font-bold tracking-wide">
-            <span className="text-[#1B5E20]">TRADE</span>
-            <span className="text-[#C5A028]">SWARM</span>
+            <span className="text-[#C5A028]">TRADE</span>
+            <span className="text-[#1B5E20]">SWARM</span>
           </div>
           <p className="mt-2 text-sm text-[#6b6b6b]">Sign in to your account</p>
         </div>
 
         <div className="rounded-xl border border-[#1f1f1f] bg-[#141414] p-6">
           <form onSubmit={handleLogin} className="flex flex-col gap-4" suppressHydrationWarning>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2" suppressHydrationWarning>
               <label htmlFor="email" className="text-sm font-medium text-white">
                 Email
               </label>
-              <div suppressHydrationWarning>
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
-                />
-              </div>
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
+                suppressHydrationWarning
+                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#c9a227] focus:outline-none"
+              />
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2" suppressHydrationWarning>
               <label htmlFor="password" className="text-sm font-medium text-white">
                 Password
               </label>
-              <div suppressHydrationWarning>
-                <input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#00ff88] focus:outline-none"
-                />
-              </div>
+              <input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+                suppressHydrationWarning
+                className="h-12 w-full rounded-lg border border-[#1f1f1f] bg-[#0a0a0a] px-4 text-base text-white placeholder:text-[#6b6b6b] focus:border-[#c9a227] focus:outline-none"
+              />
             </div>
 
             {error && (
@@ -89,7 +89,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 h-12 rounded-lg bg-[#00ff88] font-semibold text-[#0a0a0a] transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="mt-2 h-12 rounded-lg bg-[#c9a227] font-semibold text-[#0c0c0c] transition-all hover:bg-[#d4af37] disabled:opacity-50"
             >
               {isLoading ? "Signing in..." : "Sign In"}
             </button>
@@ -97,7 +97,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-[#6b6b6b]">
             Don&apos;t have an account?{" "}
-            <Link href="/auth/sign-up" className="text-[#00ff88] hover:underline">
+            <Link href="/auth/sign-up" className="text-[#c9a227] hover:underline">
               Sign up
             </Link>
           </p>
