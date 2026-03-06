@@ -29,11 +29,14 @@ jobs:
           node-version: 20
           cache: pnpm
 
-      - name: Install
-        run: pnpm install --frozen-lockfile
+        - name: Install
+          run: pnpm install --frozen-lockfile
 
-      - name: Lint
-        run: pnpm lint
+        - name: Install ripgrep
+          run: sudo apt-get update && sudo apt-get install -y ripgrep
+
+        - name: Lint
+          run: pnpm lint
 
       - name: Typecheck
         run: pnpm typecheck
