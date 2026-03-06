@@ -46,7 +46,7 @@ jobs:
 
   auto-fix:
     needs: stabilize
-    if: failure() && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze')
+    if: ${{ failure() && github.event.pull_request.draft == false && !contains(github.event.pull_request.labels.*.name, 'freeze') && secrets.OPENAI_API_KEY != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
