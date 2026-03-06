@@ -84,16 +84,21 @@ function AppContent() {
     return null
   }
 
-  const navGroups: { id: NavGroup; label: string; tag?: "edge" | "critical" }[] = [
-    { id: "war-room", label: "War Room" },
-    { id: "markets", label: "Markets" },
-    { id: "trade", label: "Trade" },
-    { id: "swarm", label: "Swarm", tag: "edge" },
-    { id: "truth", label: "Truth" },
-    { id: "outcomes", label: "Outcomes" },
-    { id: "ops", label: "Ops" },
-    { id: "account", label: "Account" },
+  const navGroups: { id: NavGroup; label: string; tag?: "edge" | "critical"; route: string }[] = [
+    { id: "war-room", label: "War Room", route: "/war-room" },
+    { id: "markets", label: "Markets", route: "/markets/watchlists" },
+    { id: "trade", label: "Trade", route: "/trade/positions" },
+    { id: "swarm", label: "Swarm", tag: "edge", route: "/swarm/consensus" },
+    { id: "truth", label: "Truth", route: "/truth/receipts" },
+    { id: "outcomes", label: "Outcomes", route: "/outcomes/journal" },
+    { id: "ops", label: "Ops", route: "/ops/health" },
+    { id: "account", label: "Account", route: "/account/billing" },
   ]
+
+  const handleNavClick = (group: { id: NavGroup; route: string }) => {
+    setActiveNav(group.id)
+    router.push(group.route)
+  }
 
   const statusBadgeColor = (status: string) => {
     if (status === "GO") return "bg-[#22c55e] text-[#0c0c0c]"
@@ -130,7 +135,7 @@ function AppContent() {
               {navGroups.slice(0, 6).map((group) => (
                 <button
                   key={group.id}
-                  onClick={() => setActiveNav(group.id)}
+                  onClick={() => handleNavClick(group)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                     activeNav === group.id
                       ? "bg-[#1a5c3a]/20 text-[#22c55e]"
@@ -162,7 +167,7 @@ function AppContent() {
               {navGroups.slice(6).map((group) => (
                 <button
                   key={group.id}
-                  onClick={() => setActiveNav(group.id)}
+                  onClick={() => handleNavClick(group)}
                   className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                     activeNav === group.id
                       ? "bg-[#1a5c3a]/20 text-[#22c55e]"
