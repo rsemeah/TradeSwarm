@@ -15,7 +15,7 @@ import { mockCandidates, mockRadarData, mockThemes, mockPortfolio } from "@/lib/
 import { TradeCard } from "@/components/trade-card"
 import { formatCurrency } from "@/lib/utils"
 
-type NavGroup = "war-room" | "markets" | "trade" | "swarm" | "truth" | "outcomes" | "ops" | "account"
+type NavGroup = "war-room" | "markets" | "trade" | "swarm" | "truth" | "outcomes" | "halal" | "ops" | "account"
 type FeedViewMode = "signals" | "watchlist" | "positions"
 
 // Nav icons
@@ -27,6 +27,7 @@ const NavIcon = ({ group, className = "h-4 w-4" }: { group: NavGroup; className?
     "swarm": <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />,
     "truth": <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />,
     "outcomes": <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6z M13.5 10.5H21A7.5 7.5 0 0013.5 3v7.5z" />,
+    "halal": <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3c-1.2 0-2.4.6-3 1.5C8.4 3.6 7.2 3 6 3 3.5 3 1.5 5 1.5 7.5c0 5 10.5 13.5 10.5 13.5S22.5 12.5 22.5 7.5C22.5 5 20.5 3 18 3c-1.2 0-2.4.6-3 1.5-.6-.9-1.8-1.5-3-1.5z" />,
     "ops": <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.42 15.17l-5.7 5.7a2.125 2.125 0 01-3-3l5.7-5.7m3-3l3.18-3.18a2.125 2.125 0 013 3L14.42 12.17m-3-3l3 3" />,
     "account": <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z" />,
   }
@@ -84,13 +85,14 @@ function AppContent() {
     return null
   }
 
-  const navGroups: { id: NavGroup; label: string; tag?: "edge" | "critical"; route: string }[] = [
+  const navGroups: { id: NavGroup; label: string; tag?: "edge" | "critical" | "sharia"; route: string }[] = [
     { id: "war-room", label: "War Room", route: "/war-room" },
     { id: "markets", label: "Markets", route: "/markets/watchlists" },
     { id: "trade", label: "Trade", route: "/trade/positions" },
     { id: "swarm", label: "Swarm", tag: "edge", route: "/swarm/consensus" },
     { id: "truth", label: "Truth", route: "/truth/receipts" },
     { id: "outcomes", label: "Outcomes", route: "/outcomes/journal" },
+    { id: "halal", label: "Halal Mode", tag: "sharia", route: "/halal/scanner" },
     { id: "ops", label: "Ops", route: "/ops/health" },
     { id: "account", label: "Account", route: "/account/billing" },
   ]

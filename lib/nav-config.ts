@@ -1,7 +1,7 @@
 // TradeSwarm Navigation Architecture
 // 27 screens across 8 groups
 
-export type NavTag = "BROKER" | "SWARM" | "TRUTHSERUM" | "CALIBRATION" | "OPS" | "ACCOUNT"
+export type NavTag = "BROKER" | "SWARM" | "TRUTHSERUM" | "CALIBRATION" | "OPS" | "ACCOUNT" | "HALAL"
 
 export interface NavScreen {
   id: string
@@ -27,6 +27,7 @@ export const TAG_COLORS: Record<NavTag, { bg: string; border: string; text: stri
   CALIBRATION: { bg: "#2a2a1a", border: "#5f5f2a", text: "#d4d45b" },
   OPS: { bg: "#2a1a1a", border: "#5f2a2a", text: "#d45b5b" },
   ACCOUNT: { bg: "#1a2525", border: "#2a5050", text: "#5bd4d4" },
+  HALAL: { bg: "#1a251a", border: "#2a5f3a", text: "#5bd48b" },
 }
 
 // Priority screens for MVP
@@ -108,6 +109,19 @@ export const NAV_PRIMARY: NavGroup[] = [
       { id: "journal", label: "Trade Journal", tag: "CALIBRATION", desc: "Manual outcome logging — win/loss, realized PnL, notes", route: "/outcomes/journal" },
       { id: "performance", label: "Performance Analytics", tag: "CALIBRATION", desc: "PnL curves, win rate, expectancy, drawdown, confidence calibration", route: "/outcomes/performance" },
       { id: "experiments", label: "Experiments", tag: "CALIBRATION", desc: "A/B strategy runs, controlled config comparisons over time", route: "/outcomes/experiments" },
+      { id: "purification", label: "Purification Ledger", tag: "HALAL", desc: "Track and donate haram income portions from trading profits", route: "/outcomes/purification" },
+    ]
+  },
+  {
+    id: "halal",
+    label: "Halal Mode",
+    icon: "☪",
+    badge: "SHARIA",
+    screens: [
+      { id: "scanner", label: "Halal Scanner", tag: "HALAL", desc: "Screen stocks for Sharia compliance (H1-H4 gates)", route: "/halal/scanner" },
+      { id: "gate", label: "Compliance Gate", tag: "HALAL", desc: "Pre-trade compliance check (H5-H7 gates)", route: "/halal/gate" },
+      { id: "receipts", label: "Sharia Receipts", tag: "HALAL", desc: "Immutable compliance attestations with purification tracking", route: "/halal/receipts" },
+      { id: "profile", label: "Sharia Profile", tag: "HALAL", desc: "Configure compliance standard (AAOIFI/DJIM), ratios, charity", route: "/halal/profile" },
     ]
   },
 ]
