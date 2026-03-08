@@ -67,7 +67,7 @@ export function LearnWhyModal({ isOpen, onClose, candidate }: LearnWhyModalProps
   if (!isOpen || !candidate) return null
 
   const impactColors = {
-    positive: "text-accent bg-accent/10 border-accent/30",
+    positive: "text-primary bg-primary/10 border-primary/30",
     negative: "text-danger bg-danger/10 border-danger/30",
     neutral: "text-muted-foreground bg-muted border-border",
   }
@@ -109,7 +109,7 @@ export function LearnWhyModal({ isOpen, onClose, candidate }: LearnWhyModalProps
         <div className="max-h-[60vh] overflow-y-auto p-4">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               <p className="mt-4 text-sm text-muted-foreground">Analyzing trade conditions...</p>
             </div>
           ) : error ? (
@@ -135,7 +135,7 @@ export function LearnWhyModal({ isOpen, onClose, candidate }: LearnWhyModalProps
                   onClick={() => setViewMode("simple")}
                   className={`flex-1 rounded-lg py-2 text-xs font-medium transition-colors ${
                     viewMode === "simple"
-                      ? "bg-accent text-background"
+                      ? "bg-accent text-accent-foreground"
                       : "bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -145,7 +145,7 @@ export function LearnWhyModal({ isOpen, onClose, candidate }: LearnWhyModalProps
                   onClick={() => setViewMode("technical")}
                   className={`flex-1 rounded-lg py-2 text-xs font-medium transition-colors ${
                     viewMode === "technical"
-                      ? "bg-accent text-background"
+                      ? "bg-accent text-accent-foreground"
                       : "bg-muted text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -180,8 +180,8 @@ export function LearnWhyModal({ isOpen, onClose, candidate }: LearnWhyModalProps
               </div>
               
               {/* What Would Change */}
-              <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
-                <p className="mb-1 text-[10px] font-bold text-accent uppercase">To Make This a GO</p>
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+                <p className="mb-1 text-[10px] font-bold text-primary uppercase">To Make This a GO</p>
                 <p className="text-xs text-foreground leading-relaxed">{explanation.whatWouldChange}</p>
               </div>
               

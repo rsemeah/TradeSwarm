@@ -66,14 +66,6 @@ export async function GET() {
 
   try {
     const supabase = await createClient()
-    const [dbResult, yahooResult] = await Promise.all([
-      supabase.from("trade_receipts").select("id", { count: "exact", head: true }),
-      probeMarketDataHealth(),
-    ])
-
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const [{ count: tradeCount }, { data: recentEvents, count: eventCount }] = await Promise.all([
-      supabase.from("trades").select("id", { count: "exact", head: true }).gte("created_at", yesterday),
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
     const [dbResult, yahooResult, tradesResult, eventsResult, receiptResult, quoteProbe, expirationProbe] = await Promise.all([
@@ -91,16 +83,6 @@ export async function GET() {
       probeYahooExpirations("SPY"),
     ])
 
-    const errEvents = recentEvents?.filter((event) => event.status === "error") ?? []
-    const blockedEvents = recentEvents?.filter((event) => event.status === "blocked") ?? []
-
-    const dbOk = !dbResult.error
-    const yahooOk = yahooResult.status !== "down"
-
-    return Response.json({
-      ok: dbOk && yahooOk,
-      status: dbOk && yahooOk ? "operational" : "degraded",
-      reasonCode: yahooOk ? null : "YAHOO_PROBE_DEGRADED",
     const recentEvents = eventsResult.data ?? []
     const recentTrades = tradesResult.data ?? []
     const errEvents = recentEvents.filter((e) => e.status === "error")
@@ -132,18 +114,12 @@ export async function GET() {
           expirations: expirationProbe,
         },
       },
-      components: {
-        regime: { status: "operational", circuit: getMarketDataCircuitStatus() },
-        risk: { status: "operational" },
-        deliberation: { status: "operational" },
-      },
       metrics: {
         tradesLast24h: tradesResult.count ?? 0,
         receiptsLast24h: receiptResult.count ?? 0,
         eventsLast24h: eventsResult.count ?? 0,
         errorsLast24h: errEvents.length,
         blockedLast24h: blockedEvents.length,
-      },
         successRate: tradesResult.count ? Math.round((successfulTrades.length / tradesResult.count) * 100) : 0,
         avgTrustScore: recentTrades.length
           ? Math.round(recentTrades.reduce((sum, t) => sum + (t.trust_score || 0), 0) / recentTrades.length)
@@ -159,6 +135,9 @@ export async function GET() {
           circuit: getMarketDataCircuitStatus(),
         },
         risk: {
+          status: "operational",
+        },
+        deliberation: {
           status: "operational",
         },
       },

@@ -85,7 +85,7 @@ export function SniperOverlay({ candidate, onConfirm, onCancel, isSimulation = f
           <div className="font-mono text-3xl font-bold text-foreground">{candidate.ticker}</div>
           
           {/* Amount */}
-          <div className="mt-1 font-mono text-xl text-accent">${candidate.amountDollars}</div>
+          <div className="mt-1 font-mono text-xl text-primary">${candidate.amountDollars}</div>
           
           {/* Status */}
           {!locked ? (
@@ -132,7 +132,7 @@ export function SniperOverlay({ candidate, onConfirm, onCancel, isSimulation = f
             locked
               ? isSimulation
                 ? "bg-warning text-background"
-                : "bg-accent text-background"
+                : "bg-primary text-primary-foreground"
               : "bg-muted text-muted-foreground cursor-not-allowed"
           }`}
         >

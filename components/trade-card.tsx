@@ -14,7 +14,7 @@ interface TradeCardProps {
 
 function StatusBadge({ status }: { status: TradeCandidate["status"] }) {
   const config = {
-    GO: { bg: "bg-accent", text: "text-background", glow: "shadow-[0_0_12px_rgba(0,255,136,0.4)]" },
+    GO: { bg: "bg-primary", text: "text-primary-foreground", glow: "" },
     WAIT: { bg: "bg-warning", text: "text-background", glow: "" },
     NO: { bg: "bg-danger", text: "text-foreground", glow: "" },
   }
@@ -53,9 +53,9 @@ function TrustMeter({ score, winLikelihood }: { score: number; winLikelihood: nu
 
 function BulletPoint({ type, text }: { type: "why" | "risk" | "amount"; text: string }) {
   const dotColor = {
-    why: "bg-accent",
+    why: "bg-primary",
     risk: "bg-warning",
-    amount: "bg-accent",
+    amount: "bg-primary",
   }
 
   return (
@@ -95,7 +95,7 @@ function AuditPanel({ candidate, view }: { candidate: TradeCandidate; view: "sim
         </div>
         <div className="flex justify-between">
           <span className="text-muted-foreground">Decision:</span>
-          <span className="font-medium text-accent">{auditSimple.decision} ✓</span>
+          <span className="font-medium text-primary">{auditSimple.decision} ✓</span>
         </div>
       </div>
     )
@@ -230,7 +230,7 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
       {/* Amount Box (only for GO) */}
       {isGo && candidate.amountDollars && (
         <div className="mb-4 rounded-lg border border-border p-3 text-center">
-          <p className="font-mono text-[28px] font-bold text-accent">
+          <p className="font-mono text-[28px] font-bold text-primary">
             ${candidate.amountDollars}
           </p>
           <p className="text-[10px] text-muted-foreground">Recommended amount</p>
@@ -244,7 +244,7 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
             <button 
               onClick={handleExecuteClick}
               disabled={isLoading}
-              className="w-full rounded-md bg-accent py-3 text-sm font-bold text-background transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full rounded-md bg-primary py-3 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? "Processing..." : "Execute Trade →"}
             </button>
@@ -351,11 +351,11 @@ export function TradeCard({ candidate, onTradeComplete }: TradeCardProps) {
                 <div key={factor.name}>
                   <div className="mb-1 flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">{factor.name}</span>
-                    <span className={factor.polarity === "positive" ? "text-accent" : "text-warning"}>{factor.value}%</span>
+                    <span className={factor.polarity === "positive" ? "text-primary" : "text-warning"}>{factor.value}%</span>
                   </div>
                   <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                     <div
-                      className={`h-full rounded-full ${factor.polarity === "positive" ? "bg-accent" : "bg-warning"}`}
+                      className={`h-full rounded-full ${factor.polarity === "positive" ? "bg-primary" : "bg-warning"}`}
                       style={{ width: `${Math.min(factor.value, 100)}%` }}
                     />
                   </div>

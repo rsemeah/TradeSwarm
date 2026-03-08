@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss"
 
 const config: Config = {
-  darkMode: ["class"],
+  darkMode: "class",
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -11,28 +11,35 @@ const config: Config = {
     extend: {
       colors: {
         background: "#0a0a0a",
-        foreground: "#ffffff",
+        foreground: "#f2f2f2",
         card: {
-          DEFAULT: "#141414",
-          foreground: "#ffffff",
+          DEFAULT: "#111111",
+          foreground: "#f2f2f2",
         },
         border: "#1f1f1f",
         muted: {
-          DEFAULT: "#141414",
+          DEFAULT: "#111111",
           foreground: "#6b6b6b",
         },
-        accent: {
-          DEFAULT: "#00ff88",
-        },
-        warning: "#ffcc00",
-        danger: "#ff4444",
+        // Forest green — trade direction / performance / GO
         primary: {
-          DEFAULT: "#00ff88",
+          DEFAULT: "#1f9d73",
+          hover: "#137a57",
+          active: "#0e5f43",
+          foreground: "#f2f2f2",
+        },
+        // Champagne gold — system / governance / institutional layer
+        accent: {
+          DEFAULT: "#c6a75e",
+          hover: "#e1c27a",
           foreground: "#0a0a0a",
         },
+        // Risk
+        warning: "#b8860b",
+        danger: "#8b0000",
         secondary: {
           DEFAULT: "#6b6b6b",
-          foreground: "#ffffff",
+          foreground: "#f2f2f2",
         },
       },
       fontFamily: {

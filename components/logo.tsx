@@ -96,12 +96,12 @@ function LogoIcon({ size = 36, className = "" }: { size?: number; className?: st
         strokeWidth="1.5"
       />
       {/* Candlestick accents on wings */}
-      <rect x="8" y="18" width="2" height="6" fill="#00ff88" />
-      <rect x="12" y="16" width="2" height="8" fill="#ff4444" />
-      <rect x="16" y="19" width="2" height="5" fill="#00ff88" />
-      <rect x="50" y="18" width="2" height="6" fill="#00ff88" />
-      <rect x="46" y="16" width="2" height="8" fill="#ff4444" />
-      <rect x="54" y="19" width="2" height="5" fill="#00ff88" />
+      <rect x="8" y="18" width="2" height="6" fill="#1f9d73" />
+      <rect x="12" y="16" width="2" height="8" fill="#8b0000" />
+      <rect x="16" y="19" width="2" height="5" fill="#1f9d73" />
+      <rect x="50" y="18" width="2" height="6" fill="#1f9d73" />
+      <rect x="46" y="16" width="2" height="8" fill="#8b0000" />
+      <rect x="54" y="19" width="2" height="5" fill="#1f9d73" />
     </svg>
   )
 }

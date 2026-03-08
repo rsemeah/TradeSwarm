@@ -21,7 +21,7 @@ export function MoneyScreen() {
         <p className="font-mono text-[32px] font-bold text-foreground">
           {formatCurrency(portfolio.balance)}
         </p>
-        <p className="font-mono text-base text-accent">
+        <p className="font-mono text-base text-primary">
           +{formatCurrency(portfolio.dayPnl)}
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
@@ -41,7 +41,7 @@ export function MoneyScreen() {
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-accent transition-all duration-500"
+              className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${drawdownUsedPct}%` }}
             />
           </div>
@@ -60,7 +60,7 @@ export function MoneyScreen() {
           <button
             className={`flex-1 rounded-full border px-3 py-2 text-xs font-medium transition-colors ${
               portfolio.safetyMode === "training_wheels"
-                ? "border-accent bg-accent/10 text-accent"
+                ? "border-accent bg-accent/10 text-accent-foreground"
                 : "border-border text-muted-foreground"
             }`}
           >
@@ -89,7 +89,7 @@ export function MoneyScreen() {
           </p>
           <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-accent transition-all duration-500"
+              className="h-full rounded-full bg-primary transition-all duration-500"
               style={{ width: `${progressPct}%` }}
             />
           </div>
@@ -130,7 +130,7 @@ export function MoneyScreen() {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Avg Gain</p>
-            <p className="font-mono text-lg font-bold text-accent">+${portfolio.weekStats.avgGainDollars}</p>
+            <p className="font-mono text-lg font-bold text-primary">+${portfolio.weekStats.avgGainDollars}</p>
           </div>
         </div>
       </div>
