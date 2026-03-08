@@ -1,0 +1,5 @@
+# CODEOWNERS — every PR requires review from @rsemeah.
+# To add a GitHub team, replace @rsemeah with @org/team-slug.
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+*  @rsemeah
