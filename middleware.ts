@@ -1,7 +1,12 @@
+import { isLocalDevBypassEnabled } from '@/lib/env/devBypass'
 import { updateSession } from '@/lib/supabase/middleware'
-import { type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  if (isLocalDevBypassEnabled() && request.nextUrl.pathname.startsWith('/api/')) {
+    return NextResponse.next({ request })
+  }
+
   return await updateSession(request)
 }
 

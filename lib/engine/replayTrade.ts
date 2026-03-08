@@ -1,6 +1,6 @@
-import { createAdminClient } from "@/lib/supabase/admin"
-import { evaluateSafety } from "@/lib/engine/safety"
 import { hashDeterministic } from "@/lib/engine/determinism"
+import { evaluateSafety } from "@/lib/engine/safety"
+import { createAdminClient } from "@/lib/supabase/admin"
 import type { CanonicalProofBundle } from "@/lib/types/proof-bundle"
 
 interface ReplayDiff {
@@ -10,23 +10,55 @@ interface ReplayDiff {
   rule: "strict" | "tolerance"
 }
 
-type MismatchClassification = "none" | "data_mismatch" | "nondeterministic_logic" | "version_drift"
+type MismatchClassification =
+  | "none"
+  | "data_mismatch"
+  | "nondeterministic_logic"
+  | "version_drift"
+  | "MISSING_RECEIPT"
 
 export interface ReplayReport {
   tradeId: string
   match: boolean
-  inputSnapshot: CanonicalProofBundle["input_snapshot"]
-  marketSnapshot: CanonicalProofBundle["market_snapshot"]
-  originalSafetyDecision: CanonicalProofBundle["safety_decision"]
-  replaySafetyDecision: CanonicalProofBundle["safety_decision"]
+  inputSnapshot: CanonicalProofBundle["input_snapshot"] | null
+  marketSnapshot: CanonicalProofBundle["market_snapshot"] | null
+  originalSafetyDecision: CanonicalProofBundle["safety_decision"] | null
+  replaySafetyDecision: CanonicalProofBundle["safety_decision"] | null
   diffs: ReplayDiff[]
   mismatchClassification: MismatchClassification
+  determinism_hash: string | null
+  market_snapshot_hash: string | null
+  random_seed: number | null
+}
+
+function buildMissingReceiptReport(tradeId: string): ReplayReport {
+  return {
+    tradeId,
+    match: false,
+    inputSnapshot: null,
+    marketSnapshot: null,
+    originalSafetyDecision: null,
+    replaySafetyDecision: null,
+    diffs: [
+      {
+        field: "receipt",
+        original: null,
+        replayed: "missing",
+        rule: "strict",
+      },
+    ],
+    mismatchClassification: "MISSING_RECEIPT",
+    determinism_hash: null,
+    market_snapshot_hash: null,
+    random_seed: null,
+  }
 }
 
 export async function replayTrade(tradeId: string): Promise<ReplayReport> {
-  const supabase = createAdminClient()
+  try {
+    const supabase = createAdminClient()
 
-  const { data: receipt, error } = await supabase
+    const { data: receipt, error } = await supabase
     .from("trade_receipts")
     .select("id,trade_id,proof_bundle")
     .eq("trade_id", tradeId)
@@ -35,8 +67,9 @@ export async function replayTrade(tradeId: string): Promise<ReplayReport> {
     .maybeSingle()
 
   if (error) throw error
+
   if (!receipt?.proof_bundle) {
-    throw new Error("No proof bundle found for trade")
+    return buildMissingReceiptReport(tradeId)
   }
 
   const proof = receipt.proof_bundle as CanonicalProofBundle
@@ -122,7 +155,8 @@ export async function replayTrade(tradeId: string): Promise<ReplayReport> {
     })
   }
 
-  const replayEngineVersion = process.env.ENGINE_VERSION ?? proof.metadata?.determinism?.engine_version ?? proof.metadata?.engine_version ?? "unknown"
+  const replayEngineVersion =
+    process.env.ENGINE_VERSION ?? proof.metadata?.determinism?.engine_version ?? proof.metadata?.engine_version ?? "unknown"
   let mismatchClassification: MismatchClassification = "none"
   if (diffs.length > 0) {
     const metadataVersion = proof.metadata?.determinism?.engine_version ?? proof.metadata?.engine_version
@@ -144,15 +178,21 @@ export async function replayTrade(tradeId: string): Promise<ReplayReport> {
     replaySafetyDecision,
     diffs,
     mismatchClassification,
+    determinism_hash: proof.metadata?.determinism?.determinism_hash ?? null,
+    market_snapshot_hash: proof.metadata?.determinism?.market_snapshot_hash ?? null,
+    random_seed: proof.metadata?.determinism?.random_seed ?? null,
   }
 
-  await supabase.from("trade_replay_reports").insert({
-    trade_id: tradeId,
-    receipt_id: receipt.id,
-    match: report.match,
-    mismatch_classification: report.mismatchClassification,
-    diff: report.diffs,
-  })
+    await supabase.from("trade_replay_reports").insert({
+      trade_id: tradeId,
+      receipt_id: receipt.id,
+      match: report.match,
+      mismatch_classification: report.mismatchClassification,
+      diff: report.diffs,
+    })
 
-  return report
+    return report
+  } catch {
+    return buildMissingReceiptReport(tradeId)
+  }
 }

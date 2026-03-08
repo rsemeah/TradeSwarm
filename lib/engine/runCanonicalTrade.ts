@@ -26,6 +26,18 @@ interface CanonicalTradeResult {
   blocked: boolean
 }
 
+function buildPreviewFallbackTradeId(bundle: CanonicalProofBundle): string {
+  const hash = bundle.metadata?.determinism?.determinism_hash
+  if (hash && hash.length >= 16) {
+    return `preview_${hash.slice(0, 16)}`
+  }
+
+  return `preview_${hashDeterministic({
+    ticker: bundle.input_snapshot.ticker,
+    timestamp: bundle.timestamp,
+  }).slice(0, 16)}`
+}
+
 interface PersistedMarketSnapshot {
   snapshotId: string | null
   contentHash: string
@@ -314,9 +326,32 @@ export async function runCanonicalTrade(input: CanonicalTradeInput): Promise<Can
   const blocked = canonicalProofBundle.safety_decision.safety_status === "BLOCKED"
 
   const shouldPersist = input.mode === "preview" || input.mode === "simulate" || (input.mode === "execute" && !blocked)
-  const persisted = shouldPersist
-    ? await persistCanonical(input, canonicalProofBundle)
-    : { receiptId: null, tradeId: null }
+
+  let persisted: { receiptId: string | null; tradeId: string | null }
+  if (!shouldPersist) {
+    persisted = { receiptId: null, tradeId: null }
+  } else {
+    try {
+      persisted = await persistCanonical(input, canonicalProofBundle)
+    } catch (error) {
+      if (input.mode !== "preview") {
+        throw error
+      }
+
+      persisted = {
+        receiptId: null,
+        tradeId: buildPreviewFallbackTradeId(canonicalProofBundle),
+      }
+
+      canonicalProofBundle.metadata = {
+        ...canonicalProofBundle.metadata,
+        warnings: [
+          ...(canonicalProofBundle.metadata?.warnings ?? []),
+          "RECEIPT_PERSIST_FAILED",
+        ],
+      }
+    }
+  }
 
   return {
     proofBundle: canonicalProofBundle,
