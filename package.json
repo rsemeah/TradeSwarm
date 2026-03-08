@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "node scripts/governance-lint.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "capital:check": "node scripts/capital-check.mjs",
+    "ops:check": "node scripts/capital-check.mjs --equity 100000 --conf 0.81 --drift OK && curl -fsS http://localhost:3000/api/health/engine > /dev/null"
   },
   "dependencies": {
     "next": "^16.1.6",

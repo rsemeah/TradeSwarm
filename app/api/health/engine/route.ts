@@ -1,9 +1,10 @@
-import { createClient } from "@/lib/supabase/server"
 import { probeMarketDataHealth } from "@/lib/engine/market-context"
 import { getMarketDataCircuitStatus } from "@/lib/engine/regime"
+import { createClient } from "@/lib/supabase/server"
 
 async function probeYahooQuote(ticker: string) {
   const startedAt = Date.now()
+
   try {
     const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${ticker}`
     const response = await fetch(url, {
@@ -14,10 +15,10 @@ async function probeYahooQuote(ticker: string) {
     const quote = json?.quoteResponse?.result?.[0]
 
     return {
-      status: response.ok && !!quote ? "ok" : "error",
+      status: response.ok && quote ? "ok" : "error",
       latencyMs: Date.now() - startedAt,
-      symbol: quote?.symbol || ticker,
-      regularMarketPrice: quote?.regularMarketPrice || null,
+      symbol: quote?.symbol ?? ticker,
+      regularMarketPrice: quote?.regularMarketPrice ?? null,
       error: response.ok ? null : `HTTP ${response.status}`,
     }
   } catch (error) {
@@ -33,6 +34,7 @@ async function probeYahooQuote(ticker: string) {
 
 async function probeYahooExpirations(ticker: string) {
   const startedAt = Date.now()
+
   try {
     const url = `https://query1.finance.yahoo.com/v7/finance/options/${ticker}`
     const response = await fetch(url, {
@@ -41,13 +43,13 @@ async function probeYahooExpirations(ticker: string) {
     })
     const json = await response.json()
     const result = json?.optionChain?.result?.[0]
-    const expirations = result?.expirationDates || []
+    const expirations = result?.expirationDates ?? []
 
     return {
       status: response.ok && expirations.length > 0 ? "ok" : "error",
       latencyMs: Date.now() - startedAt,
       count: expirations.length,
-      firstExpiration: expirations[0] || null,
+      firstExpiration: expirations[0] ?? null,
       error: response.ok ? null : `HTTP ${response.status}`,
     }
   } catch (error) {
@@ -66,54 +68,30 @@ export async function GET() {
 
   try {
     const supabase = await createClient()
-    const [dbResult, yahooResult] = await Promise.all([
-      supabase.from("trade_receipts").select("id", { count: "exact", head: true }),
-      probeMarketDataHealth(),
-    ])
-
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const [{ count: tradeCount }, { data: recentEvents, count: eventCount }] = await Promise.all([
-      supabase.from("trades").select("id", { count: "exact", head: true }).gte("created_at", yesterday),
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
     const [dbResult, yahooResult, tradesResult, eventsResult, receiptResult, quoteProbe, expirationProbe] = await Promise.all([
-      supabase.from("trade_receipts").select("*", { count: "exact", head: true }),
+      supabase.from("trade_receipts").select("id", { count: "exact", head: true }),
       probeMarketDataHealth(),
-      supabase.from("trades").select("*", { count: "exact" }).gte("created_at", yesterday).order("created_at", { ascending: false }).limit(10),
-      supabase
-        .from("engine_events")
-        .select("name, status, created_at", { count: "exact" })
-        .gte("created_at", yesterday)
-        .order("created_at", { ascending: false })
-        .limit(50),
-      supabase.from("trade_receipts").select("*", { count: "exact", head: true }).gte("created_at", yesterday),
+      supabase.from("trades").select("status,trust_score,created_at", { count: "exact" }).gte("created_at", yesterday).order("created_at", { ascending: false }).limit(10),
+      supabase.from("engine_events").select("name,status,created_at", { count: "exact" }).gte("created_at", yesterday).order("created_at", { ascending: false }).limit(50),
+      supabase.from("trade_receipts").select("id", { count: "exact", head: true }).gte("created_at", yesterday),
       probeYahooQuote("SPY"),
       probeYahooExpirations("SPY"),
     ])
 
-    const errEvents = recentEvents?.filter((event) => event.status === "error") ?? []
-    const blockedEvents = recentEvents?.filter((event) => event.status === "blocked") ?? []
-
-    const dbOk = !dbResult.error
-    const yahooOk = yahooResult.status !== "down"
-
-    return Response.json({
-      ok: dbOk && yahooOk,
-      status: dbOk && yahooOk ? "operational" : "degraded",
-      reasonCode: yahooOk ? null : "YAHOO_PROBE_DEGRADED",
     const recentEvents = eventsResult.data ?? []
     const recentTrades = tradesResult.data ?? []
-    const errEvents = recentEvents.filter((e) => e.status === "error")
-    const blockedEvents = recentEvents.filter((e) => e.status === "blocked")
-    const successfulTrades = recentTrades.filter((t) => t.status === "GO")
+    const errEvents = recentEvents.filter((event) => event.status === "error")
+    const blockedEvents = recentEvents.filter((event) => event.status === "blocked")
+    const successfulTrades = recentTrades.filter((trade) => trade.status === "GO")
 
     const dbOk = !dbResult.error
     const yahooOk = yahooResult.status !== "down"
     const degraded = quoteProbe.status !== "ok" || expirationProbe.status !== "ok"
-    const ok = dbOk && yahooOk
 
     return Response.json({
-      ok,
+      ok: dbOk && yahooOk,
       status: degraded ? "degraded" : "operational",
       reasonCode: degraded ? "YAHOO_PROBE_DEGRADED" : null,
       engineVersion: "1.0.0",
@@ -132,53 +110,22 @@ export async function GET() {
           expirations: expirationProbe,
         },
       },
-      components: {
-        regime: { status: "operational", circuit: getMarketDataCircuitStatus() },
-        risk: { status: "operational" },
-        deliberation: { status: "operational" },
-      },
       metrics: {
         tradesLast24h: tradesResult.count ?? 0,
         receiptsLast24h: receiptResult.count ?? 0,
         eventsLast24h: eventsResult.count ?? 0,
         errorsLast24h: errEvents.length,
         blockedLast24h: blockedEvents.length,
-      },
         successRate: tradesResult.count ? Math.round((successfulTrades.length / tradesResult.count) * 100) : 0,
         avgTrustScore: recentTrades.length
-          ? Math.round(recentTrades.reduce((sum, t) => sum + (t.trust_score || 0), 0) / recentTrades.length)
+          ? Math.round(recentTrades.reduce((sum, trade) => sum + (trade.trust_score ?? 0), 0) / recentTrades.length)
           : 0,
       },
       components: {
-        aiSwarm: {
-          status: "ok",
-          models: ["groq/llama-3.3-70b-versatile", "openai/gpt-4o-mini"],
-        },
-        regime: {
-          status: "operational",
-          circuit: getMarketDataCircuitStatus(),
-        },
-        risk: {
-          status: "operational",
-        },
+        regime: { status: "operational", circuit: getMarketDataCircuitStatus() },
+        risk: { status: "operational" },
+        deliberation: { status: "operational" },
       },
-      adapterDiagnostics: {
-        groq: {
-          status: process.env.GROQ_API_KEY ? "ok" : "not_configured",
-          configured: !!process.env.GROQ_API_KEY,
-        },
-        openai: {
-          status: process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY ? "ok" : "not_configured",
-          configured: !!process.env.OPENAI_API_KEY || !!process.env.AI_GATEWAY_API_KEY,
-        },
-        supabase: {
-          status: "ok",
-        },
-      },
-      circuitBreakers: {
-        yahooFinance: getMarketDataCircuitStatus(),
-      },
-      lastActivity: recentTrades[0]?.created_at || null,
       timestamp: new Date().toISOString(),
       latencyMs: Date.now() - startTime,
     })
@@ -192,7 +139,7 @@ export async function GET() {
         timestamp: new Date().toISOString(),
         latencyMs: Date.now() - startTime,
       },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }

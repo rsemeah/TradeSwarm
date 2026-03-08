@@ -1,7 +1,12 @@
 import { createClient } from "@/lib/supabase/server"
-import { evaluateSafety } from "@/lib/engine/safety"
-import { runTradeSwarm } from "@/lib/engine/orchestrator"
+import { BrokerRouter } from "@/lib/broker/brokerRouter"
+import { computeCapitalSize, type CapitalPolicy, type ConfidenceTier } from "@/lib/capital/sizing"
+import { evaluateCapitalGate } from "@/lib/capital/policyGate"
 import { hashDeterministic } from "@/lib/engine/determinism"
+import { runTradeSwarm } from "@/lib/engine/orchestrator"
+import { evaluateSafety } from "@/lib/engine/safety"
+import { buildMarketSnapshot } from "@/lib/market/snapshot"
+import { shouldAllowExecute } from "@/lib/risk/executionGuard"
 import type { ProofBundle } from "@/lib/types/proof"
 import type { CanonicalProofBundle, ModelRound, SafetyDecision } from "@/lib/types/proof-bundle"
 
@@ -31,6 +36,27 @@ interface PersistedMarketSnapshot {
   contentHash: string
 }
 
+interface CapitalPolicyRow {
+  confidence_tiers?: Record<string, number>
+  kelly_fraction_cap?: number
+  hard_cap_dollars?: number
+  drift_warn_throttle?: number
+  drawdown_brake_floor?: number
+  daily_loss_limit_total?: number
+  max_trades_per_day?: number
+  feed_staleness_max_sec?: number
+  kill_switch_active?: boolean
+}
+
+
+interface NormalizedCapitalPolicy extends CapitalPolicy {
+  drift_warn_throttle: number
+  drawdown_brake_floor: number
+  daily_loss_limit_total: number
+  max_trades_per_day: number
+  feed_staleness_max_sec: number
+  kill_switch_active: boolean
+}
 function buildModelRounds(bundle: ProofBundle): ModelRound[] {
   return bundle.deliberation.map((round) => ({
     round_id: String(round.roundId),
@@ -161,16 +187,73 @@ function buildCanonicalProofBundle(bundle: ProofBundle, input: CanonicalTradeInp
   }
 }
 
+function deriveDriftState(canonicalBundle: CanonicalProofBundle): "OK" | "WARN" | "ALERT" {
+  const warnings = canonicalBundle.metadata?.warnings ?? []
+  const warningBlob = warnings.join(" ").toLowerCase()
+  if (warningBlob.includes("drift_alert") || warningBlob.includes("drift alert")) return "ALERT"
+  if (warningBlob.includes("drift_warn") || warningBlob.includes("drift warn")) return "WARN"
+  return "OK"
+}
+
+function toNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function normalizeCapitalPolicy(row: CapitalPolicyRow | null | undefined): NormalizedCapitalPolicy {
+  return {
+    confidence_tiers: {
+      high: toNumber(row?.confidence_tiers?.high, 1),
+      medium: toNumber(row?.confidence_tiers?.medium, 0.7),
+      low: toNumber(row?.confidence_tiers?.low, 0.4),
+    },
+    kelly_fraction_cap: toNumber(row?.kelly_fraction_cap, 0.25),
+    hard_cap_dollars: toNumber(row?.hard_cap_dollars, 500),
+    drift_warn_throttle: toNumber(row?.drift_warn_throttle, 0.6),
+    drawdown_brake_floor: toNumber(row?.drawdown_brake_floor, 0),
+    daily_loss_limit_total: toNumber(row?.daily_loss_limit_total, 500),
+    max_trades_per_day: toNumber(row?.max_trades_per_day, 10),
+    feed_staleness_max_sec: toNumber(row?.feed_staleness_max_sec, 120),
+    kill_switch_active: Boolean(row?.kill_switch_active),
+  }
+}
+
+function confidenceTierFromTrust(trustScore: number): ConfidenceTier {
+  if (trustScore >= 85) return "high"
+  if (trustScore >= 65) return "medium"
+  return "low"
+}
+
+async function logGovernanceEvent(reason: string, metrics: Record<string, unknown>): Promise<void> {
+  try {
+    const supabase = await createClient()
+    await supabase.from("model_governance_log").insert({
+      previous_version: null,
+      new_version: null,
+      change_summary: `execution_guard_blocked:${reason}`,
+      triggered_by: "execution_guard",
+      metrics_snapshot: metrics,
+    })
+  } catch (error) {
+    console.warn("Failed to write governance log", error)
+  }
+}
+
 async function persistMarketSnapshot(canonicalBundle: CanonicalProofBundle): Promise<PersistedMarketSnapshot> {
   const supabase = await createClient()
-  const contentHash = hashDeterministic(canonicalBundle.market_snapshot)
+  const built = buildMarketSnapshot(
+    String(canonicalBundle.market_snapshot.source ?? "unknown"),
+    canonicalBundle.market_snapshot.as_of,
+    1,
+    canonicalBundle.market_snapshot as unknown as Record<string, unknown>,
+  )
 
   const payload = {
-    snapshot_hash: contentHash,
-    snapshot: canonicalBundle.market_snapshot,
-    source: String(canonicalBundle.market_snapshot.source ?? "unknown"),
-    as_of: canonicalBundle.market_snapshot.as_of,
-    latency_ms: canonicalBundle.market_snapshot.latency_ms,
+    snapshot_hash: built.snapshotHash,
+    provider: built.provider,
+    schema_version: built.schemaVersion,
+    as_of: built.asOf,
+    payload: built.payload,
   }
 
   const { data, error } = await supabase
@@ -180,15 +263,113 @@ async function persistMarketSnapshot(canonicalBundle: CanonicalProofBundle): Pro
     .single()
 
   if (error) {
-    return { snapshotId: null, contentHash }
+    return { snapshotId: null, contentHash: built.snapshotHash }
   }
 
-  return { snapshotId: data.id as string, contentHash }
+  return { snapshotId: data.id as string, contentHash: built.snapshotHash }
+}
+
+async function applyCapitalAndExecutionGuards(input: CanonicalTradeInput, canonicalBundle: CanonicalProofBundle): Promise<{ blocked: boolean; reason?: string }> {
+  if (input.mode !== "execute") return { blocked: false }
+
+  const supabase = await createClient()
+  const [policyResult, tradesTodayResult] = await Promise.all([
+    supabase
+      .from("capital_policy")
+      .select("confidence_tiers,kelly_fraction_cap,hard_cap_dollars,drift_warn_throttle,drawdown_brake_floor,daily_loss_limit_total,max_trades_per_day,feed_staleness_max_sec,kill_switch_active")
+      .eq("active", true)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("trades")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", input.userId)
+      .gte("created_at", `${new Date().toISOString().slice(0, 10)}T00:00:00`),
+  ])
+
+  const policy = normalizeCapitalPolicy(policyResult.data)
+  const driftState = deriveDriftState(canonicalBundle)
+  const feedAgeSec = Math.max(0, Math.floor((Date.now() - Date.parse(canonicalBundle.market_snapshot.as_of)) / 1000))
+
+  const capitalGate = evaluateCapitalGate({
+    driftState,
+    drawdownBrake: policy.drawdown_brake_floor,
+    driftWarnThrottle: policy.drift_warn_throttle,
+  })
+
+  if (!capitalGate.allowed) {
+    await logGovernanceEvent(capitalGate.reason ?? "capital_gate_blocked", { driftState, feedAgeSec })
+    return { blocked: true, reason: capitalGate.reason }
+  }
+
+  const brokerMode = process.env.BROKER_MODE === "live" ? "live" : "paper"
+  const brokerRouter = new BrokerRouter()
+  const brokerHealth = await brokerRouter.healthCheck(brokerMode === "live" ? "schwab" : "paper")
+
+  const guard = shouldAllowExecute({
+    killSwitch: { active: policy.kill_switch_active },
+    driftState,
+    drawdownBrake: policy.drawdown_brake_floor,
+    feedAgeSec,
+    feedStalenessMaxSec: policy.feed_staleness_max_sec,
+    dailyLossTotal: 0,
+    dailyLossLimitTotal: policy.daily_loss_limit_total,
+    tradesToday: tradesTodayResult.count ?? 0,
+    maxTradesPerDay: policy.max_trades_per_day,
+    brokerHealthOk: brokerHealth.ok,
+    brokerMode,
+  })
+
+  if (!guard.allowed) {
+    await logGovernanceEvent(guard.reason ?? "execution_guard_blocked", {
+      driftState,
+      feedAgeSec,
+      tradesToday: tradesTodayResult.count ?? 0,
+      brokerMode,
+    })
+    return { blocked: true, reason: guard.reason }
+  }
+
+  const confidenceTier = confidenceTierFromTrust(canonicalBundle.trust_score)
+  const capital = computeCapitalSize(
+    {
+      balance: input.balance,
+      edge: Math.max(1, Math.abs(toNumber((canonicalBundle.risk_snapshot as { sharpeRatio?: number }).sharpeRatio, 1))),
+      winProbability: Math.min(0.95, Math.max(0.05, canonicalBundle.trust_score / 100)),
+      confidenceTier,
+      throttleMultiplier: guard.throttleMultiplier,
+    },
+    policy,
+  )
+
+  canonicalBundle.capital = {
+    kelly_fraction: capital.kellyFractionCapped,
+    confidence_tier: confidenceTier,
+    throttle_multiplier: capital.throttleMultiplier,
+    recommended_size: capital.recommendedSize,
+    hard_capped: capital.hardCapped,
+  }
+
+  if (canonicalBundle.metadata?.determinism) {
+    canonicalBundle.metadata.determinism.determinism_hash = hashDeterministic({
+      input_snapshot: canonicalBundle.input_snapshot,
+      market_snapshot_hash: canonicalBundle.metadata.determinism.market_snapshot_hash,
+      engine_version: canonicalBundle.metadata.determinism.engine_version,
+      config_hash: canonicalBundle.metadata.determinism.config_hash,
+      random_seed: canonicalBundle.metadata.determinism.random_seed,
+      capital: canonicalBundle.capital,
+    })
+  }
+
+  return { blocked: false }
 }
 
 async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: CanonicalProofBundle): Promise<{ receiptId: string | null; tradeId: string | null }> {
   const supabase = await createClient()
   const persistedSnapshot = await persistMarketSnapshot(canonicalBundle)
+
+  canonicalBundle.market_snapshot_hash = persistedSnapshot.contentHash
 
   if (canonicalBundle.metadata?.determinism) {
     canonicalBundle.metadata.determinism.market_snapshot_ref = persistedSnapshot.snapshotId
@@ -200,6 +381,7 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
       config_hash: canonicalBundle.metadata.determinism.config_hash,
       random_seed: canonicalBundle.metadata.determinism.random_seed,
       monte_carlo_seed: canonicalBundle.metadata.determinism.random_seed,
+      capital: canonicalBundle.capital,
     })
   }
 
@@ -213,7 +395,7 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
         strategy: "options_spread",
         action: input.mode,
         status: input.mode === "execute" ? "executed" : "simulated",
-        amount: canonicalBundle.input_snapshot.requested_amount,
+        amount: canonicalBundle.capital?.recommended_size ?? canonicalBundle.input_snapshot.requested_amount,
         trust_score: canonicalBundle.trust_score,
         rationale: canonicalBundle.model_rounds[canonicalBundle.model_rounds.length - 1]?.outcome.reason ?? null,
         ai_consensus: {
@@ -232,6 +414,28 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
     }
 
     tradeId = insertedTrade.id as string
+
+    if (input.mode === "execute") {
+      const brokerMode = process.env.BROKER_MODE === "live" ? "live" : "paper"
+      const brokerProvider = brokerMode === "live" ? "schwab" : "paper"
+      const brokerRouter = new BrokerRouter()
+      const orderIntent = {
+        tradeId,
+        symbol: input.ticker,
+        side: "buy" as const,
+        quantity: 1,
+        orderType: "market" as const,
+        idempotencyKey: canonicalBundle.metadata?.request_id ?? `${tradeId}-intent`,
+      }
+      const brokerReceipt = await brokerRouter.placeOrder(orderIntent, brokerProvider)
+
+      await supabase.from("broker_orders").insert({
+        trade_id: tradeId,
+        intent: orderIntent,
+        status: brokerReceipt.status,
+        receipt: brokerReceipt,
+      })
+    }
   }
 
   const { data: receipt, error: receiptError } = await supabase
@@ -242,7 +446,7 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
       user_id: input.userId,
       ticker: input.ticker,
       action: input.mode,
-      amount: canonicalBundle.input_snapshot.requested_amount,
+      amount: canonicalBundle.capital?.recommended_size ?? canonicalBundle.input_snapshot.requested_amount,
       trust_score: canonicalBundle.trust_score,
       proof_bundle: canonicalBundle,
       proof_bundle_version: canonicalBundle.version,
@@ -311,8 +515,18 @@ export async function runCanonicalTrade(input: CanonicalTradeInput): Promise<Can
 
   const canonicalProofBundle = buildCanonicalProofBundle(base.proofBundle, input)
   await enforceReplayPolicy(input.mode, canonicalProofBundle.metadata?.engine_version ?? "unknown")
-  const blocked = canonicalProofBundle.safety_decision.safety_status === "BLOCKED"
 
+  const cp4Guard = await applyCapitalAndExecutionGuards(input, canonicalProofBundle)
+  if (cp4Guard.blocked) {
+    canonicalProofBundle.safety_decision = {
+      ...canonicalProofBundle.safety_decision,
+      safety_status: "BLOCKED",
+      reason_code: cp4Guard.reason ?? "execution_guard_blocked",
+      reasons: [...(canonicalProofBundle.safety_decision.reasons ?? []), cp4Guard.reason ?? "execution_guard_blocked"],
+    }
+  }
+
+  const blocked = canonicalProofBundle.safety_decision.safety_status === "BLOCKED"
   const shouldPersist = input.mode === "preview" || input.mode === "simulate" || (input.mode === "execute" && !blocked)
   const persisted = shouldPersist
     ? await persistCanonical(input, canonicalProofBundle)
