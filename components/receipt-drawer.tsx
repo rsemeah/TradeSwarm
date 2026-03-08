@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import type { ProofBundle } from "@/lib/types/proof"
 import type { TradeScoringDetail } from "@/lib/types"
 
@@ -8,12 +9,6 @@ export interface ReceiptData {
   executedAt: Date
   isSimulation: boolean
   scoring?: TradeScoringDetail
-  gates?: {
-    name: string
-    passed: boolean
-    value: string
-    threshold: string
-  }[]
 }
 
 interface ReceiptDrawerProps {
@@ -22,37 +17,12 @@ interface ReceiptDrawerProps {
   receipt: ReceiptData | null
 }
 
-function verdictColor(v: string) {
+type TabId = "summary" | "regime" | "risk" | "deliberation" | "scoring"
+
+function verdictColorClass(v: string) {
   if (v === "GO") return "text-emerald-400"
   if (v === "WAIT") return "text-amber-300"
   return "text-rose-400"
-}
-
-export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) {
-  if (!isOpen || !receipt) return null
-
-  const { proofBundle, executedAt } = receipt
-  const finalDecision = proofBundle.finalDecision
-
-  return (
-    <div className="fixed inset-0 z-50">
-      <button aria-label="Close receipt drawer" className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-slate-950 p-4 text-slate-100">
-        <div className="mb-4 flex items-start justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-slate-400">Trade Receipt</p>
-            <h2 className="text-2xl font-semibold">{proofBundle.ticker}</h2>
-            <p className="text-xs text-slate-400">
-              {proofBundle.action} · {executedAt.toISOString()} · v{proofBundle.engineVersion}
-            </p>
-          </div>
-          <button className="rounded border border-slate-700 px-2 py-1 text-xs" onClick={onClose}>
-type TabId = "summary" | "regime" | "risk" | "deliberation" | "scoring"
-
-function verdictColor(v: string) {
-  if (v === "GO") return "bg-accent/20 text-accent"
-  if (v === "WAIT") return "bg-warning/20 text-warning"
-  return "bg-danger/20 text-danger"
 }
 
 function ScoreBar({ value, max = 100 }: { value: number; max?: number }) {
@@ -69,7 +39,23 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
 
   if (!isOpen || !receipt) return null
 
-  const { proofBundle: pb, executedAt } = receipt
+  const pb = receipt.proofBundle
+  const executedAt = receipt.executedAt
+  const finalDecision = pb.finalDecision
+
+  function handleExport() {
+    try {
+      const blob = new Blob([JSON.stringify(pb, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `tradeswarm-proof-${pb.ticker}-${String(pb.requestId ?? "").slice(0, 8)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      // noop
+    }
+  }
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "summary", label: "Summary" },
@@ -78,16 +64,6 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
     { id: "deliberation", label: "AI Rounds" },
     { id: "scoring", label: "Score" },
   ]
-
-  function handleExport() {
-    const blob = new Blob([JSON.stringify(pb, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `tradeswarm-proof-${pb.ticker}-${pb.requestId.slice(0, 8)}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
 
   return (
     <div className="fixed inset-0 z-50">
@@ -101,8 +77,8 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
           <div className="flex items-start justify-between">
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${verdictColor(pb.finalDecision.action)}`}>
-                  {pb.finalDecision.action}
+                <span className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase ${verdictColorClass(finalDecision.action)}`}>
+                  {finalDecision.action}
                 </span>
                 {pb.engineDegraded && (
                   <span className="rounded bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning">degraded</span>
@@ -114,7 +90,7 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
               </p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="font-mono text-xl font-bold text-accent">${pb.finalDecision.recommendedAmount?.toLocaleString() ?? "—"}</p>
+              <p className="font-mono text-xl font-bold text-accent">${finalDecision.recommendedAmount?.toLocaleString() ?? "—"}</p>
               <p className="text-[10px] text-muted-foreground">recommended</p>
             </div>
           </div>
@@ -139,42 +115,42 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
             <>
               <div className="rounded-lg border border-border bg-background p-3">
                 <p className="text-muted-foreground">Reason</p>
-                <p className="mt-1 text-foreground">{pb.finalDecision.reason}</p>
+                <p className="mt-1 text-foreground">{finalDecision.reason}</p>
               </div>
               <div className="rounded-lg border border-border bg-background p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Trust Score</span>
-                  <span className="font-mono font-bold text-foreground">{pb.finalDecision.trustScore}/100</span>
+                  <span className="font-mono font-bold text-foreground">{finalDecision.trustScore}/100</span>
                 </div>
-                <ScoreBar value={pb.finalDecision.trustScore} />
+                <ScoreBar value={finalDecision.trustScore} />
               </div>
             </>
           )}
 
           {activeTab === "regime" && (
             <div className="rounded-lg border border-border bg-background p-3">
-              <p>Trend: {pb.regime.trend}</p>
-              <p>Volatility: {pb.regime.volatility}</p>
-              <p>Momentum: {pb.regime.momentum}</p>
-              <p>Confidence: {(pb.regime.confidence * 100).toFixed(0)}%</p>
+              <p>Trend: {pb.regime?.trend}</p>
+              <p>Volatility: {pb.regime?.volatility}</p>
+              <p>Momentum: {pb.regime?.momentum}</p>
+              <p>Confidence: {pb.regime?.confidence ? (pb.regime.confidence * 100).toFixed(0) + "%" : "N/A"}</p>
             </div>
           )}
 
           {activeTab === "risk" && (
             <div className="rounded-lg border border-border bg-background p-3">
-              <p>Risk level: {pb.risk.riskLevel}</p>
-              <p>Kelly fraction: {pb.risk.kellyFraction.toFixed(3)}</p>
-              <p>Position size: ${pb.risk.positionSizeRecommended.toFixed(2)}</p>
-              <p>Max drawdown: {(pb.risk.maxDrawdown * 100).toFixed(2)}%</p>
+              <p>Risk level: {pb.risk?.riskLevel ?? "N/A"}</p>
+              <p>Kelly fraction: {pb.risk?.kellyFraction ? pb.risk.kellyFraction.toFixed(3) : "N/A"}</p>
+              <p>Position size: ${pb.risk?.positionSizeRecommended ? pb.risk.positionSizeRecommended.toFixed(2) : "N/A"}</p>
+              <p>Max drawdown: {pb.risk?.maxDrawdown ? (pb.risk.maxDrawdown * 100).toFixed(2) + "%" : "N/A"}</p>
             </div>
           )}
 
           {activeTab === "deliberation" && (
             <div className="space-y-2">
-              {pb.deliberation.map((round) => (
-                <div key={round.roundId} className="rounded-lg border border-border bg-background p-3">
+              {(pb.deliberation ?? []).map((round: any) => (
+                <div key={round.roundId ?? round.stage} className="rounded-lg border border-border bg-background p-3">
                   <p className="font-semibold">{round.stage}</p>
-                  <p className="text-muted-foreground">{round.outcome.reason}</p>
+                  <p className="text-muted-foreground">{round.outcome?.reason}</p>
                 </div>
               ))}
             </div>
@@ -182,9 +158,9 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
 
           {activeTab === "scoring" && (
             <div className="rounded-lg border border-border bg-background p-3">
-              <p>Raw Avg: {pb.scoring.rawAvgScore.toFixed(2)}</p>
-              <p>Agreement: {(pb.scoring.agreementRatio * 100).toFixed(1)}%</p>
-              <p>Penalty: {(pb.scoring.penaltyFactor * 100).toFixed(1)}%</p>
+              <p>Raw Avg: {(pb.scoring?.rawAvgScore ?? 0).toFixed(2)}</p>
+              <p>Agreement: {pb.scoring?.agreementRatio ? (pb.scoring.agreementRatio * 100).toFixed(1) + "%" : "N/A"}</p>
+              <p>Penalty: {pb.scoring?.penaltyFactor ? (pb.scoring.penaltyFactor * 100).toFixed(1) + "%" : "N/A"}</p>
             </div>
           )}
         </div>
@@ -200,20 +176,17 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
 
         <section className="mb-4 rounded border border-slate-800 p-3">
           <p className="text-xs text-slate-400">Decision</p>
-          <p className={`text-lg font-semibold ${verdictColor(finalDecision.action)}`}>{finalDecision.action}</p>
+          <p className={`text-lg font-semibold ${verdictColorClass(finalDecision.action)}`}>{finalDecision.action}</p>
           <p className="text-sm text-slate-200">{finalDecision.reason}</p>
-          <p className="mt-2 text-xs text-slate-400">
-            Trust {finalDecision.trustScore} · Recommended ${finalDecision.recommendedAmount ?? 0}
-          </p>
+          <p className="mt-2 text-xs text-slate-400">Trust {finalDecision.trustScore} · Recommended ${finalDecision.recommendedAmount ?? 0}</p>
         </section>
 
         <section className="mb-4 rounded border border-slate-800 p-3">
           <p className="mb-2 text-xs text-slate-400">Preflight gates</p>
           <ul className="space-y-1 text-sm">
-            {proofBundle.preflight.gates.map((gate) => (
+            {(pb.preflight?.gates ?? []).map((gate: any) => (
               <li key={gate.name}>
-                <span className={gate.passed ? "text-emerald-400" : "text-rose-400"}>{gate.passed ? "✓" : "✕"}</span>{" "}
-                {gate.name} — {gate.reason}
+                <span className={gate.passed ? "text-emerald-400" : "text-rose-400"}>{gate.passed ? "✓" : "✕"}</span> {gate.name} — {gate.reason}
               </li>
             ))}
           </ul>
@@ -221,8 +194,8 @@ export function ReceiptDrawer({ isOpen, onClose, receipt }: ReceiptDrawerProps) 
 
         <section className="rounded border border-slate-800 p-3">
           <p className="mb-2 text-xs text-slate-400">Determinism</p>
-          <p className="text-xs text-slate-300">Request ID: {proofBundle.requestId}</p>
-          <p className="text-xs text-slate-300">Monte Carlo seed: {proofBundle.risk.monteCarloSeed}</p>
+          <p className="text-xs text-slate-300">Request ID: {pb.requestId}</p>
+          <p className="text-xs text-slate-300">Monte Carlo seed: {pb.risk?.monteCarloSeed ?? "N/A"}</p>
         </section>
       </div>
     </div>
