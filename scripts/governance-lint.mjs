@@ -9,7 +9,7 @@ const checks = [
   },
   {
     name: "Determinism hash wiring is present",
-    cmd: "rg --line-number 'determinism_hash|determinismHash' lib app",
+    cmd: "rg --line-number 'determinism_hash|determinismHash' lib app src",
     mustBeEmpty: false,
   },
 ]

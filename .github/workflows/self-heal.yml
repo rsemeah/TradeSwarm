@@ -32,6 +32,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      - name: Install ripgrep
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Lint
         run: pnpm lint
 
@@ -53,6 +56,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Clean untracked build artifacts
+        run: git clean -fd
 
       - name: Run Codex Auto-Fix
         uses: openai/codex-action@v1
