@@ -47,9 +47,9 @@ export async function POST(req: Request) {
     const horizons: number[] = config?.horizons_days || [1, 5, 20]
 
     const { data: trades, error: tradesError } = await supabase
-      .from("trades")
-      .select("id,user_id,created_at,outcome,pnl,win_likelihood,trust_score,ai_consensus,regime_data,risk_data")
-      .in("status", ["executed", "simulated"])
+      .from("trades_v2")
+      .select("id,user_id,created_at,outcome,realized_pnl,engine_score_at_entry,regime_at_entry,proof_snapshot")
+      .eq("outcome", "open")
       .order("created_at", { ascending: true })
 
     if (tradesError) {
@@ -77,14 +77,14 @@ export async function POST(req: Request) {
           continue
         }
 
-        const predictedRaw = Number(trade.win_likelihood ?? trade.trust_score ?? 50)
+        const predictedRaw = Number(trade.engine_score_at_entry ?? 50)
         const predictedProbability = Math.max(0, Math.min(1, predictedRaw / 100))
 
         let realizedOutcome = 0
         if (trade.outcome === "win") realizedOutcome = 1
         if (trade.outcome === "loss") realizedOutcome = 0
         if (trade.outcome !== "win" && trade.outcome !== "loss") {
-          realizedOutcome = Number(trade.pnl ?? 0) > 0 ? 1 : 0
+          realizedOutcome = Number(trade.realized_pnl ?? 0) > 0 ? 1 : 0
         }
 
         const labelRecord = {
@@ -99,9 +99,9 @@ export async function POST(req: Request) {
         if (labelError) throw labelError
         labelsCreated += 1
 
-        const regimeData = (trade.regime_data || {}) as Record<string, unknown>
-        const riskData = (trade.risk_data || {}) as Record<string, unknown>
-        const aiConsensus = (trade.ai_consensus || {}) as Record<string, unknown>
+        const proofSnapshot = (trade.proof_snapshot || {}) as Record<string, unknown>
+        const riskData = (proofSnapshot.risk || proofSnapshot.risk_snapshot || {}) as Record<string, unknown>
+        const aiConsensus = proofSnapshot as Record<string, unknown>
 
         const datasetRecord = {
           trade_id: trade.id,
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
           horizon_days: horizon,
           predicted_probability: predictedProbability,
           realized_outcome: realizedOutcome,
-          regime: String(regimeData.trend || regimeData.regime || "unknown"),
+          regime: trade.regime_at_entry || String((proofSnapshot.regime as Record<string, unknown>)?.trend || "unknown"),
           risk_grade: getRiskGrade(riskData),
           model_combination: getModelCombination(aiConsensus),
           confidence_bucket: getConfidenceBucket(predictedProbability),

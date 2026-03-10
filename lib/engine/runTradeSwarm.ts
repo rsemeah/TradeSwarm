@@ -363,20 +363,19 @@ async function persistProofBundle(
   const tradeRecord = {
     user_id: userId,
     ticker: proofBundle.decision.ticker,
-    strategy: "options_spread",
-    action: mode,
-    amount: proofBundle.decision.recommendedAmount || 0,
-    trust_score: proofBundle.decision.trustScore,
-    status: proofBundle.decision.status,
-    is_paper: mode === "simulate" || proofBundle.meta.safetyMode === "training_wheels",
-    reasoning: proofBundle.decision.bullets.why,
-    ai_consensus: proofBundle,
-    regime_data: proofBundle.regime,
-    risk_data: proofBundle.risk,
+    strategy_type: "options_spread",
+    entry_date: new Date().toISOString(),
+    credit_received: proofBundle.decision.recommendedAmount || 0,
+    max_risk: proofBundle.decision.recommendedAmount || 0,
+    engine_score_at_entry: proofBundle.decision.trustScore,
+    regime_at_entry: String((proofBundle.regime as Record<string, unknown>)?.trend ?? "unknown"),
+    proof_snapshot: proofBundle,
+    outcome: "open",
+    notes: proofBundle.decision.bullets.why,
   }
 
   const { data: insertedTrade, error } = await supabase
-    .from("trades")
+    .from("trades_v2")
     .insert(tradeRecord)
     .select()
     .single()

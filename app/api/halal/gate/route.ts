@@ -19,8 +19,8 @@ export async function POST(req: NextRequest) {
     
     // Get user's current positions for exposure calculation
     const { data: positions } = await supabase
-      .from('trades')
-      .select('ticker, current_value')
+      .from('trades_v2')
+      .select('ticker, credit_received')
       .eq('user_id', user.id)
       .eq('outcome', 'open')
     
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     // Calculate current exposure to this ticker
     const currentExposure = positions
       ?.filter(p => p.ticker === ticker.toUpperCase())
-      .reduce((sum, p) => sum + (p.current_value || 0), 0) || 0
+      .reduce((sum, p) => sum + (p.credit_received || 0), 0) || 0
     
     // Max exposure per position (default 10% of portfolio)
     const maxExposure = 10000 // Would be dynamic based on portfolio size
