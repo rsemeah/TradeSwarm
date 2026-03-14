@@ -1,0 +1,81 @@
+name: Copilot Auto-Approve
+
+# Approves PRs authored by trusted bot actors (Copilot, Dependabot) once
+# all required safety checks have passed, removing the human-approval bottleneck
+# for automated agent workflows.
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+      - Safety Gate
+      - Codex Policy
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  auto-approve:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Fetch PR number
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          PR_NUMBER=$(gh pr list \
+            --repo "$REPO" \
+            --state open \
+            --json number,headRefOid \
+            --jq '.[] | select(.headRefOid == $ENV.HEAD_SHA) | .number' \
+            | head -1)
+          echo "number=${PR_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Check PR author is a trusted bot
+        id: check-actor
+        if: steps.pr.outputs.number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          AUTHOR=$(gh pr view "$PR_NUMBER" \
+            --repo "$REPO" \
+            --json author \
+            --jq '.author.login')
+          echo "author=${AUTHOR}" >> "$GITHUB_OUTPUT"
+
+          # Trusted bot actors: Copilot agent and Dependabot
+          if [[ "$AUTHOR" == "copilot-swe-agent" || \
+                "$AUTHOR" == "dependabot[bot]" || \
+                "$AUTHOR" == "github-actions[bot]" ]]; then
+            echo "trusted=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "trusted=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Approve PR
+        if: >-
+          steps.pr.outputs.number != '' &&
+          steps.check-actor.outputs.trusted == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          AUTHOR: ${{ steps.check-actor.outputs.author }}
+        run: |
+          echo "Auto-approving PR #${PR_NUMBER} authored by ${AUTHOR} (trusted bot actor)"
+          gh pr review "$PR_NUMBER" \
+            --repo "$REPO" \
+            --approve \
+            --body "✅ Auto-approved: all required safety gates passed and PR author is a trusted bot actor (\`${AUTHOR}\`)."

@@ -3,7 +3,7 @@
 // No silent unit mixing
 
 export type Strategy = 'PCS' | 'CCS' | 'CDS'
-export type Tier = 'A' | 'B' | 'C'
+export type Tier = 'S' | 'A' | 'B' | 'C'
 export type DeltaSource = 'exchange' | 'approximated' | 'unavailable'
 export type SigmaSource = 'contract_iv' | 'rv20_proxy' | 'default_0.20'
 export type ScenarioLabel = 'Win' | 'Partial' | 'Loss'
@@ -141,7 +141,9 @@ export interface CandidateProofBundle {
   stress: StressProof
 }
 
-export interface ScanResult {
+// Note: This is different from src/lib/scanner/types.ts ScanResult
+// This is the proof-bundle version used for TruthSerum verification
+export interface ProofBundleScanResult {
   scan_id: string
   scanned_at: string
   cached: boolean

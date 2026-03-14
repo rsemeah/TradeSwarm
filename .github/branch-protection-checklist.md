@@ -4,6 +4,10 @@ Apply these rules in GitHub Settings → Branches → `main`:
 
 1. Require a pull request before merging.
 2. Require approvals (minimum 1).
+   - **Approval bottleneck note:** The `copilot-auto-approve` workflow automatically
+     approves PRs from trusted bot actors (`copilot-swe-agent`, `dependabot[bot]`,
+     `github-actions[bot]`) once CI, Safety Gate, and Codex Policy checks pass.
+     Human approval remains required for all PRs authored by human contributors.
 3. Require status checks to pass before merging:
    - `build-and-typecheck`
    - `analyze` (CodeQL)
