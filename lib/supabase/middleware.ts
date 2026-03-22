@@ -47,7 +47,7 @@ export async function updateSession(request: NextRequest) {
   // Redirect logged in users away from auth pages
   if (user && request.nextUrl.pathname.startsWith('/auth')) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = '/war-room'
     return NextResponse.redirect(url)
   }
 

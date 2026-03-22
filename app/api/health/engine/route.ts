@@ -72,7 +72,7 @@ export async function GET() {
     const [dbResult, yahooResult, tradesResult, receiptsResult, quoteProbe, expirationProbe] = await Promise.all([
       supabase.from("trade_receipts").select("*", { count: "exact", head: true }),
       probeMarketDataHealth(),
-      supabase.from("trades").select("*", { count: "exact" }).gte("created_at", yesterday).order("created_at", { ascending: false }).limit(10),
+      supabase.from("trades_v2").select("*", { count: "exact" }).gte("created_at", yesterday).order("created_at", { ascending: false }).limit(10),
       supabase.from("trade_receipts").select("*", { count: "exact", head: true }).gte("created_at", yesterday),
       probeYahooQuote("SPY"),
       probeYahooExpirations("SPY"),
@@ -81,7 +81,7 @@ export async function GET() {
     const recentTrades = tradesResult.data || []
     const tradeCount = tradesResult.count || 0
     const receiptCount = receiptsResult.count || 0
-    const successfulTrades = recentTrades.filter((t) => t.status === "GO")
+    const successfulTrades = recentTrades.filter((t) => t.outcome === "win")
     const successRate = tradeCount ? (successfulTrades.length / tradeCount) * 100 : 0
 
     const dbOk = !dbResult.error

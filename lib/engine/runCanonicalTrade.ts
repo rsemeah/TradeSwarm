@@ -206,23 +206,19 @@ async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: Can
   let tradeId: string | null = null
   if (input.mode !== "preview" && canonicalBundle.safety_decision.safety_status === "ALLOWED") {
     const { data: insertedTrade, error: tradeError } = await supabase
-      .from("trades")
+      .from("trades_v2")
       .insert({
         user_id: input.userId,
         ticker: input.ticker,
-        strategy: "options_spread",
-        action: input.mode,
-        status: input.mode === "execute" ? "executed" : "simulated",
-        amount: canonicalBundle.input_snapshot.requested_amount,
-        trust_score: canonicalBundle.trust_score,
-        rationale: canonicalBundle.model_rounds[canonicalBundle.model_rounds.length - 1]?.outcome.reason ?? null,
-        ai_consensus: {
-          consensus_score: canonicalBundle.consensus_score,
-          model_provider: canonicalBundle.model_provider,
-          model_version: canonicalBundle.model_version,
-        },
-        regime_data: canonicalBundle.regime_snapshot,
-        risk_data: canonicalBundle.risk_snapshot,
+        strategy_type: "options_spread",
+        entry_date: new Date().toISOString(),
+        credit_received: canonicalBundle.input_snapshot.requested_amount,
+        max_risk: canonicalBundle.input_snapshot.requested_amount,
+        engine_score_at_entry: canonicalBundle.trust_score,
+        regime_at_entry: String(canonicalBundle.regime_snapshot?.trend ?? "unknown"),
+        proof_snapshot: canonicalBundle,
+        outcome: "open",
+        notes: canonicalBundle.model_rounds[canonicalBundle.model_rounds.length - 1]?.outcome.reason ?? null,
       })
       .select("id")
       .single()

@@ -454,32 +454,25 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
       const tradeRecord = {
         user_id: userId,
         ticker,
-        strategy: `${finalDecision === "NO" ? "Bearish" : "Bullish"} Spread`,
-        action,
-        amount: recommendedAmount ?? amount,
-        trust_score: scoring.trustScore,
-        status: finalDecision,
-        is_paper: safetyMode === "training_wheels" || action === "simulate",
-        reasoning: primaryBullets?.why ?? lastRound.outcome.reason,
-        ai_consensus: {
+        strategy_type: `${finalDecision === "NO" ? "Bearish" : "Bullish"} Spread`,
+        entry_date: new Date().toISOString(),
+        credit_received: recommendedAmount ?? amount,
+        max_risk: recommendedAmount ?? amount,
+        engine_score_at_entry: scoring.trustScore,
+        regime_at_entry: String(regime.trend ?? "unknown"),
+        proof_snapshot: {
           finalVerdict: finalDecision,
           trustScore: scoring.trustScore,
           consensusStrength: lastRound.outcome.consensusStrength,
+          regime: { trend: regime.trend, volatility: regime.volatility, momentum: regime.momentum },
+          risk: { riskLevel: risk.riskLevel, maxDrawdown: risk.maxDrawdown, expectedReturn: risk.expectedReturn },
         },
-        regime_data: {
-          trend: regime.trend,
-          volatility: regime.volatility,
-          momentum: regime.momentum,
-        },
-        risk_data: {
-          riskLevel: risk.riskLevel,
-          maxDrawdown: risk.maxDrawdown,
-          expectedReturn: risk.expectedReturn,
-        },
+        outcome: "open",
+        notes: primaryBullets?.why ?? lastRound.outcome.reason,
       }
 
       const { data: insertedTrade, error: tradeErr } = await supabase
-        .from("trades")
+        .from("trades_v2")
         .insert(tradeRecord)
         .select("id")
         .single()
