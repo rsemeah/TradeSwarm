@@ -46,6 +46,7 @@ export async function POST(req: Request) {
       legacyPreview: result.legacyProofBundle,
       receiptId: result.receiptId,
       blocked: result.blocked,
+      measurements: result.measurements,
     })
   } catch (error) {
     console.error("Preview error:", error)
