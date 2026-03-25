@@ -4,7 +4,11 @@ import { mockPortfolio } from "@/lib/mock-data"
 import { formatCurrency } from "@/lib/utils"
 import { useAuth } from "@/lib/auth-context"
 
-export function MoneyScreen() {
+interface MoneyScreenProps {
+  onBack?: () => void
+}
+
+export function MoneyScreen({ onBack }: MoneyScreenProps) {
   const portfolio = mockPortfolio
   const { user, signOut } = useAuth()
   const progressPct = (portfolio.paperTradesCompleted / portfolio.paperTradesRequired) * 100
@@ -13,6 +17,17 @@ export function MoneyScreen() {
   return (
     <div className="space-y-4">
       {/* Header */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+          Back to Radar
+        </button>
+      )}
       <h1 className="text-lg font-bold text-foreground">My Money</h1>
 
       {/* Balance Card */}
