@@ -1,0 +1,49 @@
+{
+  // VSCode Tasks configuration for TradeSwarm repository.
+  // These tasks run locally on the developer's machine (type: "shell").
+  //
+  // ── Secure Task Prompt Constraints ──────────────────────────────────────────
+  // 1. Log output  : every task echoes a human-readable status line so that
+  //                  results are always visible in the Terminal panel.
+  // 2. Allow-list  : only the explicitly listed commands below are permitted.
+  //                  No dynamic command construction or user-supplied shell
+  //                  injection is used.
+  // 3. No secrets  : tasks must never print or reference credentials, tokens,
+  //                  API keys, or any sensitive environment variables.
+  // 4. No privilege escalation : tasks run as the current user only; no sudo,
+  //                  su, runas, or elevated-shell invocations are allowed.
+  // ────────────────────────────────────────────────────────────────────────────
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // ── Task: Verify Agent Terminal Autonomy ──────────────────────────────
+      // Purpose : Confirms that the VS Code integrated terminal can execute
+      //           shell commands autonomously on behalf of an agent/developer.
+      //           Outputs a confirmation message and the active Node.js version
+      //           so the environment can be quickly validated without secrets
+      //           or elevated permissions.
+      //
+      // Allow-listed commands:
+      //   • echo  – prints a static, human-readable status string (no secrets).
+      //   • node --version – reports the installed Node.js runtime version.
+      //
+      // Constraints satisfied:
+      //   ✓ Log output        : "Agent check OK" and Node version are printed.
+      //   ✓ Explicit allow-list: only echo and node --version are invoked.
+      //   ✓ No secrets        : no environment variables or credentials used.
+      //   ✓ No privilege esc. : runs entirely as the current unprivileged user.
+      // ─────────────────────────────────────────────────────────────────────
+      "label": "Verify Agent Terminal Autonomy",
+      "type": "shell",
+      "command": "echo \"Agent check OK\" && node --version",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "focus": false,
+        "echo": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}
