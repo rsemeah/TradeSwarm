@@ -1,100 +1,83 @@
 # TradeSwarm — Halal Methodology
-**Version:** 1.0
-**Date:** 2026-06-10
-**Owner:** Halal Partition — Alif compliance track
-**Tasks:** T15 (route audit), T24 (100-ticker audit), T31 (compliance log)
-**Compliance Standard:** DJIM (Dow Jones Islamic Market Index)
+**Version:** 1.0 | **Date:** 2026-06-10 | **Owner:** Halal Partition
+**Compliance standard:** DJIM (Dow Jones Islamic Market Index criteria)
+**Alif artifact:** Yes — human scholar review gate required before submission
 
 ---
 
-## Purpose
-
-TradeSwarm-Halal is a DJIM-compliant partition, toggleable via `HALAL_MODE=true`.
-
-**⚠️ Alif submission requires human scholar review of T31 compliance log. Agent-generated logs are supporting evidence only.**
-
----
-
-## Screening Methodology
-
-### Primary Screen: Business Activity
-
-| Category | Verdict |
-|----------|---------|
-| Alcohol, Tobacco, Weapons, Pork | HARAM |
-| Conventional Finance (banks, insurance) | HARAM |
-| Prohibited Entertainment | HARAM (case-by-case) |
-| Activity UNKNOWN | UNKNOWN → FAIL |
-
-### Secondary Screen: Financial Ratios (DJIM)
-
-| Ratio | Threshold | Calculation |
-|-------|-----------|-------------|
-| Debt ratio | < 33% | Total debt / trailing 24-month avg market cap |
-| Cash + interest-bearing securities | < 33% | (Cash + securities) / trailing 24-month avg market cap |
-| Accounts receivable | < 33% | Accounts receivable / trailing 24-month avg market cap |
-
-Any ratio ≥ 33% → HARAM. Data unavailable → UNKNOWN → FAIL.
+## Halal Mode Flag
+- Toggleable: `HALAL_MODE=true/false` in environment
+- When enabled: all trade signals pass through halal screening gate
+- Fail-closed: UNKNOWN verdict = FAIL. Never permit unknown.
+- This flag is what makes TradeSwarm-Halal a separate product partition
 
 ---
 
-## Fail-Closed Rule
+## Screening Methodology: DJIM-Compliant
 
-**UNKNOWN verdict = FAIL. Always. Non-negotiable.**
+### Business Activity Screen (Qualitative)
+Excluded sectors (hard block):
+- Alcohol production or distribution
+- Tobacco
+- Pork-related products
+- Conventional financial services (interest-based banking, insurance)
+- Weapons / defense
+- Gambling / gaming
+- Adult entertainment
+
+### Financial Ratio Screen (Quantitative — DJIM thresholds)
+All ratios use 12-month trailing average market cap as denominator:
+
+| Ratio | DJIM Threshold | TradeSwarm Gate |
+|-------|---------------|------------------|
+| Debt / Market Cap | < 33% | FAIL if ≥ 33% |
+| Cash + Interest-bearing securities / Market Cap | < 33% | FAIL if ≥ 33% |
+| Accounts receivable / Market Cap | < 33% | FAIL if ≥ 33% |
+
+**Audit flag (T15):** Current halal route (`app/api/halal/`) must be verified as ratio-based, not blocklist-only. Blocklist-only = insufficient for DJIM compliance.
 
 ---
 
-## Implementation (T15 Audit Required)
+## Verdict Logic
+- PASS: Clears both business activity and all 3 financial ratio screens
+- FAIL: Fails any single screen
+- UNKNOWN: Data unavailable → treated as FAIL (fail-closed)
 
-**Route:** `app/api/halal/`
+---
 
-Ratio-based screening must be confirmed implemented — blocklist-only is insufficient for DJIM compliance.
+## Data Sources for Screening
+- Financial ratios: Polygon.io fundamental data (T04)
+- Business activity: SIC code + manual override list
+- Zoya API: ❌ NOT CREATED — supplementary source (T15 scope)
 
-### Data Sources
-- Primary: Polygon.io fundamentals (after T13 key rotation)
-- Fallback: Manual entry, flagged for scholar review
-- Zoya API: supplementary (account not yet created)
+---
+
+## Compliance Log (T31)
+- All halal verdicts logged per trade: ticker, verdict, ratios, timestamp
+- Log stored in Supabase alongside TruthCal™ receipts
+- **Human scholar review gate required before Alif submission**
+- Q6 (OPEN): Does Alif require human scholar review of compliance log, or is agent-generated sufficient? Verify before T31 design is finalized.
 
 ---
 
 ## 100-Ticker Audit (T24)
-
-- Run screening against 100 diverse tickers
-- Zero false positives required (no HARAM returned as HALAL)
-- UNKNOWN rate < 5%
-- Results → `docs/HALAL_100_TICKER_AUDIT.md`
+- Pre-live: run halal gate against 100 representative tickers
+- DoD: zero false positives documented (zero HARAM tickers passed as HALAL)
+- Required before Sprint 3 gate closes
 
 ---
 
-## Compliance Log Schema (T31)
-
-```json
-{
-  "ticker": "AAPL",
-  "timestamp": "2026-06-10T08:00:00Z",
-  "verdict": "HALAL",
-  "methodology_version": "DJIM-1.0",
-  "business_screen": "PASS",
-  "debt_ratio": 0.12,
-  "cash_ratio": 0.18,
-  "receivables_ratio": 0.09,
-  "data_source": "polygon",
-  "receipt_id": "<truthcal-sha256>"
-}
-```
+## Alif Accelerator Positioning
+- Market: $341B Islamic fintech
+- No high-quality halal-first AI trading engine exists
+- TradeSwarm-Halal is the Alif pitch artifact
+- TruthCal™ receipts + compliance log = verifiable proof bundle for scholars and investors
+- Target: Alif SF, up to $500k pre-seed, Q3 2026
 
 ---
 
-## Alif Submission Checklist
-
-- [ ] T15: ratio-based screening confirmed
-- [ ] T24: 100-ticker audit, zero false positives
-- [ ] T31: compliance log in Supabase
-- [ ] Human Islamic finance scholar reviewed log
-- [ ] Scholar sign-off documented
-- [ ] This file committed to repo
-- [ ] `HALAL_100_TICKER_AUDIT.md` committed
-
----
-
-*Halal-first is not a feature. It is the foundation. Bismillah.*
+## Build Rules
+1. Halal mode fail-closed — UNKNOWN = FAIL. Always.
+2. Ratio-based screening required — blocklist-only is insufficient
+3. Human scholar review gate before any Alif submission
+4. Compliance log immutable — do not modify after T31 without Ro sign-off
