@@ -315,30 +315,42 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
   // ── Stage 3.5: TruthSerum safety gate ─────────────────────────────────────
   const tsUrl = process.env.TRUTHSERUM_URL ?? "http://localhost:8787"
   const tsAdapter = new TruthSerumAdapter({ baseUrl: tsUrl })
+  // FeaturesV1Schema requires: symbol, asof_utc, spot, dte, strike, option_type, mid
+  // Map from marketContext (which uses different field names from the options chain)
   const tsFeatures = {
     symbol: ticker,
     asof_utc: new Date().toISOString(),
-    iv: (marketContext as any).impliedVolatility ?? 0.25,
-    iv_rank: (marketContext as any).ivRank ?? 50,
-    open_interest: (marketContext as any).openInterest ?? 0,
-    volume: (marketContext as any).volume ?? 0,
-    spread_pct: (marketContext as any).spreadPct ?? null,
-    bid_ask_spread: (marketContext as any).bidAskSpread ?? null,
-    underlying_price: (marketContext as any).price ?? (marketContext as any).close ?? 0,
-    strike: (marketContext as any).strike ?? 0,
-    days_to_expiry: (marketContext as any).daysToExpiry ?? 0,
-    delta: (marketContext as any).delta ?? null,
-    gamma: (marketContext as any).gamma ?? null,
-    theta: (marketContext as any).theta ?? null,
-    vega: (marketContext as any).vega ?? null,
-    earnings_within_days: (marketContext as any).earningsWithinDays ?? null,
-    news_risk: ((marketContext as any).newsRisk ?? "low") as "low" | "medium" | "high" | "critical",
-    regime: regime.name,
+    // Required fields — mapped to FeaturesV1Schema names
+    spot: Math.max(0.01, (marketContext as any).price ?? (marketContext as any).close ?? 1),
+    dte: Math.max(0, Math.round((marketContext as any).daysToExpiry ?? 30)),
+    strike: Math.max(0.01, (marketContext as any).strike ?? (marketContext as any).price ?? 1),
+    option_type: (
+      String((marketContext as any).optionType ?? "CALL").toUpperCase() === "PUT" ? "PUT" : "CALL"
+    ) as "CALL" | "PUT",
+    mid: Math.max(0, (marketContext as any).mid ?? (marketContext as any).lastPrice ?? 0),
+    // Optional fields
+    iv: (marketContext as any).impliedVolatility ?? undefined,
+    volume: (marketContext as any).volume ?? undefined,
+    open_interest: (marketContext as any).openInterest ?? undefined,
+    spread_pct: (marketContext as any).spreadPct ?? undefined,
+    delta: (marketContext as any).delta ?? undefined,
+    gamma: (marketContext as any).gamma ?? undefined,
+    theta: (marketContext as any).theta ?? undefined,
+    vega: (marketContext as any).vega ?? undefined,
+    earnings_within_days: (marketContext as any).earningsWithinDays ?? undefined,
+    news_risk: ((): "LOW" | "MED" | "HIGH" | undefined => {
+      const raw = String((marketContext as any).newsRisk ?? "").toUpperCase()
+      if (raw === "LOW") return "LOW"
+      if (raw === "MED" || raw === "MEDIUM") return "MED"
+      if (raw === "HIGH" || raw === "CRITICAL") return "HIGH"
+      return undefined
+    })(),
   }
   const tsStart = Date.now()
   const tsResult = await tsAdapter.score(tsFeatures)
+  // features_invalid = schema mismatch → treat as degraded, not a hard block
   const isDegraded = tsResult.reasons.some((r) =>
-    ["truthserum_circuit_open", "truthserum_network_error", "truthserum_timeout"].includes(r)
+    ["truthserum_circuit_open", "truthserum_network_error", "truthserum_timeout", "features_invalid"].includes(r)
   )
   const tsEvent = await emitEngineEvent({
     requestId,
