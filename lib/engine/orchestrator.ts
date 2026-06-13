@@ -3,10 +3,11 @@
  *
  * Stage order (deterministic):
  *   Preflight-0 (market data) → Regime → Risk → Preflight-gates →
- *   Deliberation → Scoring → Persist → Return
+ *   TruthSerum → Halal → Deliberation → Scoring → Persist → Return
  *
  * Policy:
  *   • Fail-closed: market data down or extreme risk → immediate NO, no trade written
+ *   • Halal gate: NON_COMPLIANT → hard block. QUESTIONABLE → proceed with warning.
  *   • Preview: persists receipt with action="preview" (auditable, no trade row)
  *   • Simulate: persists receipt + trade row (is_paper=true)
  *   • Execute: persists receipt + trade row (is_paper per safety_mode)
@@ -19,6 +20,8 @@ import { deriveSeedFromString, simulateRisk } from "./risk"
 import { runDeliberation } from "./deliberation"
 import { computeTrustScore } from "./scoring"
 import { emitEngineEvent } from "./events"
+import { TruthSerumAdapter } from "../../src/lib/adapters/truthserumAdapter"
+import { fetchZoyaCompliance, mapZoyaToHalalScreen, mapZoyaBasicToHalalScreen } from "@/lib/halal/zoya"
 import type {
   ProofBundle,
   ProofRegimeSnapshot,
@@ -307,6 +310,122 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
       ts: new Date().toISOString(),
     }
     return { proofBundle: bundle, receiptId: null, tradeId: null }
+  }
+
+  // ── Stage 3.5: TruthSerum safety gate ─────────────────────────────────────
+  const tsUrl = process.env.TRUTHSERUM_URL ?? "http://localhost:8787"
+  const tsAdapter = new TruthSerumAdapter({ baseUrl: tsUrl })
+  const tsFeatures = {
+    symbol: ticker,
+    asof_utc: new Date().toISOString(),
+    iv: (marketContext as any).impliedVolatility ?? 0.25,
+    iv_rank: (marketContext as any).ivRank ?? 50,
+    open_interest: (marketContext as any).openInterest ?? 0,
+    volume: (marketContext as any).volume ?? 0,
+    spread_pct: (marketContext as any).spreadPct ?? null,
+    bid_ask_spread: (marketContext as any).bidAskSpread ?? null,
+    underlying_price: (marketContext as any).price ?? (marketContext as any).close ?? 0,
+    strike: (marketContext as any).strike ?? 0,
+    days_to_expiry: (marketContext as any).daysToExpiry ?? 0,
+    delta: (marketContext as any).delta ?? null,
+    gamma: (marketContext as any).gamma ?? null,
+    theta: (marketContext as any).theta ?? null,
+    vega: (marketContext as any).vega ?? null,
+    earnings_within_days: (marketContext as any).earningsWithinDays ?? null,
+    news_risk: ((marketContext as any).newsRisk ?? "low") as "low" | "medium" | "high" | "critical",
+    regime: regime.name,
+  }
+  const tsStart = Date.now()
+  const tsResult = await tsAdapter.score(tsFeatures)
+  const isDegraded = tsResult.reasons.some((r) =>
+    ["truthserum_circuit_open", "truthserum_network_error", "truthserum_timeout"].includes(r)
+  )
+  const tsEvent = await emitEngineEvent({
+    requestId,
+    userId,
+    name: "TRUTHSERUM_DONE",
+    stage: "truthserum",
+    status: isDegraded ? "degraded" : tsResult.ok ? "ok" : "blocked",
+    ticker,
+    payload: { ok: tsResult.ok, score: tsResult.score, reasons: tsResult.reasons, warnings: tsResult.warnings, degraded: isDegraded },
+    durationMs: Date.now() - tsStart,
+  })
+  events.push(tsEvent)
+  if (!isDegraded && !tsResult.ok) {
+    const bundle: ProofBundle = {
+      requestId, action, ticker, engineVersion: ENGINE_VERSION, marketContext, regime, risk,
+      deliberation: [], scoring: emptyScoringResult(), preflight,
+      finalDecision: { action: "NO", reason: `TruthSerum gate blocked: ${tsResult.reasons.join(", ")}`, trustScore: 0, recommendedAmount: null },
+      engineDegraded: false, warnings, events, ts: new Date().toISOString(),
+    }
+    return { proofBundle: bundle, receiptId: null, tradeId: null }
+  }
+  if (isDegraded) {
+    warnings.push(`TruthSerum unavailable (${tsResult.reasons.join(", ")}) — proceeding degraded`)
+  }
+
+  // ── Stage 3.6: Halal compliance gate (Zoya AAOIFI) ───────────────────────
+  const halalStart = Date.now()
+  try {
+    const zoyaResult = await fetchZoyaCompliance(ticker)
+    let halalVerdict: string
+    let halalBlocked = false
+
+    if (zoyaResult.ok && zoyaResult.data) {
+      const screen = mapZoyaToHalalScreen(zoyaResult.data)
+      halalVerdict = screen.overallVerdict
+      halalBlocked = screen.overallVerdict === "NON_COMPLIANT"
+    } else if (zoyaResult.ok && zoyaResult.basic) {
+      const screen = mapZoyaBasicToHalalScreen(zoyaResult.basic)
+      halalVerdict = screen.overallVerdict
+      halalBlocked = screen.overallVerdict === "NON_COMPLIANT"
+    } else {
+      // Zoya unavailable — degrade, don't block
+      halalVerdict = "UNKNOWN"
+      warnings.push(`Halal screening unavailable: ${zoyaResult.error ?? "Zoya unreachable"} — proceeding unscreened`)
+    }
+
+    const halalEvent = await emitEngineEvent({
+      requestId,
+      userId,
+      name: "HALAL_GATE_DONE",
+      stage: "halal",
+      status: halalBlocked ? "blocked" : halalVerdict === "UNKNOWN" ? "degraded" : "ok",
+      ticker,
+      payload: {
+        verdict: halalVerdict,
+        blocked: halalBlocked,
+        plan_tier: zoyaResult.ok ? (zoyaResult.data ? "advanced" : "basic") : "unavailable",
+      },
+      durationMs: Date.now() - halalStart,
+    })
+    events.push(halalEvent)
+
+    if (halalBlocked) {
+      const bundle: ProofBundle = {
+        requestId, action, ticker, engineVersion: ENGINE_VERSION, marketContext, regime, risk,
+        deliberation: [], scoring: emptyScoringResult(), preflight,
+        finalDecision: {
+          action: "NO",
+          reason: `Halal gate blocked: ${ticker} is NON_COMPLIANT under AAOIFI methodology`,
+          trustScore: 0,
+          recommendedAmount: null,
+        },
+        engineDegraded: false, warnings, events, ts: new Date().toISOString(),
+      }
+      return { proofBundle: bundle, receiptId: null, tradeId: null }
+    }
+
+    if (halalVerdict === "QUESTIONABLE") {
+      warnings.push(`${ticker} is QUESTIONABLE under AAOIFI — purification required if traded`)
+    }
+  } catch (err) {
+    // Non-fatal — degrade and continue
+    warnings.push(`Halal gate error: ${String(err)} — proceeding unscreened`)
+    await emitEngineEvent({
+      requestId, userId, name: "HALAL_GATE_DONE", stage: "halal", status: "degraded", ticker,
+      payload: { error: String(err) }, durationMs: Date.now() - halalStart,
+    })
   }
 
   // ── Stage 4: Deliberation ─────────────────────────────────────────────────

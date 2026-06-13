@@ -29,13 +29,14 @@ export async function POST(req: Request) {
     const safetyMode = String(preferences?.safety_mode ?? "training_wheels")
     const balance = Number(portfolioStats?.balance ?? 10000)
 
+    // ── Daily limit — reads trades_v2 (engine writes here; trades table is legacy) ──
     const maxTradesPerDay = safetyMode === "training_wheels" ? 1 : safetyMode === "normal" ? 3 : 10
     const today = new Date().toISOString().split("T")[0]
     const { count: tradesToday } = await supabase
-      .from("trades")
+      .from("trades_v2")
       .select("*", { count: "exact", head: true })
       .eq("user_id", user.id)
-      .gte("created_at", `${today}T00:00:00`)
+      .gte("entry_date", `${today}T00:00:00`)
 
     if ((tradesToday ?? 0) >= maxTradesPerDay) {
       return Response.json(
@@ -82,6 +83,8 @@ export async function POST(req: Request) {
       correlationId,
       tradeId: result.tradeId,
       receiptId: result.receiptId,
+      brokerOrderId: result.brokerOrderId,
+      brokerStatus: result.brokerStatus,
       proofBundle: result.proofBundle,
       legacyProofBundle: result.legacyProofBundle,
     })

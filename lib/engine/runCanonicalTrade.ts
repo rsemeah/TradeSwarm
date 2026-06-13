@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server"
 import { evaluateSafety } from "@/lib/engine/safety"
 import { runTradeSwarm } from "@/lib/engine/orchestrator"
 import { hashDeterministic } from "@/lib/engine/determinism"
+import { submitMarketOrder } from "@/lib/broker/alpaca"
 import type { ProofBundle } from "@/lib/types/proof"
 import type { CanonicalProofBundle, ModelRound, SafetyDecision } from "@/lib/types/proof-bundle"
 
@@ -24,6 +25,8 @@ interface CanonicalTradeResult {
   receiptId: string | null
   tradeId: string | null
   blocked: boolean
+  brokerOrderId: string | null
+  brokerStatus: string | null
 }
 
 interface PersistedMarketSnapshot {
@@ -186,7 +189,10 @@ async function persistMarketSnapshot(canonicalBundle: CanonicalProofBundle): Pro
   return { snapshotId: data.id as string, contentHash }
 }
 
-async function persistCanonical(input: CanonicalTradeInput, canonicalBundle: CanonicalProofBundle): Promise<{ receiptId: string | null; tradeId: string | null }> {
+async function persistCanonical(
+  input: CanonicalTradeInput,
+  canonicalBundle: CanonicalProofBundle
+): Promise<{ receiptId: string | null; tradeId: string | null }> {
   const supabase = await createClient()
   const persistedSnapshot = await persistMarketSnapshot(canonicalBundle)
 
@@ -314,11 +320,51 @@ export async function runCanonicalTrade(input: CanonicalTradeInput): Promise<Can
     ? await persistCanonical(input, canonicalProofBundle)
     : { receiptId: null, tradeId: null }
 
+  // ── Broker execution (execute mode + not blocked only) ──────────────────────
+  let brokerOrderId: string | null = null
+  let brokerStatus: string | null = null
+
+  if (input.mode === "execute" && !blocked) {
+    const finalAction = canonicalProofBundle.model_rounds[canonicalProofBundle.model_rounds.length - 1]?.outcome.decision
+    const side = finalAction === "YES" ? "buy" : "sell"
+    const notional = canonicalProofBundle.input_snapshot.requested_amount
+
+    const orderResult = await submitMarketOrder({
+      symbol: input.ticker,
+      side,
+      notional,
+      clientOrderId: canonicalProofBundle.metadata?.request_id ?? crypto.randomUUID(),
+    })
+
+    if (orderResult.ok) {
+      brokerOrderId = orderResult.orderId
+      brokerStatus = orderResult.status
+
+      // Stamp broker confirmation onto the receipt
+      if (persisted.receiptId) {
+        const supabase = await createClient()
+        await supabase
+          .from("trade_receipts")
+          .update({
+            broker_order_id: brokerOrderId,
+            broker_status: brokerStatus,
+          })
+          .eq("id", persisted.receiptId)
+      }
+    } else {
+      // Broker rejection is non-fatal — log in warnings, preserve receipt
+      console.error("[runCanonicalTrade] Alpaca order rejected:", orderResult.error, orderResult.body)
+      brokerStatus = `REJECTED: ${orderResult.error}`
+    }
+  }
+
   return {
     proofBundle: canonicalProofBundle,
     legacyProofBundle: base.proofBundle,
     receiptId: persisted.receiptId,
     tradeId: persisted.tradeId,
     blocked,
+    brokerOrderId,
+    brokerStatus,
   }
 }
