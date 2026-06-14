@@ -19,7 +19,7 @@ import { detectRegime } from "./regime"
 import { deriveSeedFromString, simulateRisk } from "./risk"
 import { runDeliberation } from "./deliberation"
 import { computeTrustScore } from "./scoring"
-import { emitEngineEvent } from "./events"
+import { emitEngineEvent, emitStageVerdict } from "./events"
 import { TruthSerumAdapter } from "../../src/lib/adapters/truthserumAdapter"
 import { fetchZoyaCompliance, mapZoyaToHalalScreen, mapZoyaBasicToHalalScreen } from "@/lib/halal/zoya"
 import type {
@@ -364,6 +364,7 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
   })
   events.push(tsEvent)
   if (!isDegraded && !tsResult.ok) {
+    void emitStageVerdict({ runId: requestId, stage: "truthserum", verdict: "FAIL", score: tsResult.score ?? null, reason: tsResult.reasons.join(", "), meta: { reasons: tsResult.reasons } })
     const bundle: ProofBundle = {
       requestId, action, ticker, engineVersion: ENGINE_VERSION, marketContext, regime, risk,
       deliberation: [], scoring: emptyScoringResult(), preflight,
@@ -374,6 +375,9 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
   }
   if (isDegraded) {
     warnings.push(`TruthSerum unavailable (${tsResult.reasons.join(", ")}) — proceeding degraded`)
+    void emitStageVerdict({ runId: requestId, stage: "truthserum", verdict: "DEGRADED", score: null, reason: tsResult.reasons.join(", "), meta: { degraded: true } })
+  } else {
+    void emitStageVerdict({ runId: requestId, stage: "truthserum", verdict: "PASS", score: tsResult.score ?? null, reason: null, meta: { warnings: tsResult.warnings } })
   }
 
   // ── Stage 3.6: Halal compliance gate (Zoya AAOIFI) ───────────────────────
@@ -425,11 +429,17 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
         },
         engineDegraded: false, warnings, events, ts: new Date().toISOString(),
       }
+      void emitStageVerdict({ runId: requestId, stage: "halal", verdict: "BLOCKED", score: null, reason: `${ticker} NON_COMPLIANT under AAOIFI`, meta: { ticker, verdict: halalVerdict } })
       return { proofBundle: bundle, receiptId: null, tradeId: null }
     }
 
     if (halalVerdict === "QUESTIONABLE") {
       warnings.push(`${ticker} is QUESTIONABLE under AAOIFI — purification required if traded`)
+      void emitStageVerdict({ runId: requestId, stage: "halal", verdict: "WARN", score: null, reason: "QUESTIONABLE — purification required", meta: { ticker, verdict: halalVerdict } })
+    } else if (halalVerdict === "UNKNOWN") {
+      void emitStageVerdict({ runId: requestId, stage: "halal", verdict: "DEGRADED", score: null, reason: "Zoya unavailable", meta: { ticker } })
+    } else {
+      void emitStageVerdict({ runId: requestId, stage: "halal", verdict: "PASS", score: null, reason: null, meta: { ticker, verdict: halalVerdict } })
     }
   } catch (err) {
     // Non-fatal — degrade and continue
@@ -544,6 +554,14 @@ export async function runTradeSwarm(params: SwarmParams): Promise<SwarmResult> {
     durationMs: Date.now() - scoringStart,
   })
   events.push(scoreEvent)
+  void emitStageVerdict({
+    runId: requestId,
+    stage: "scoring",
+    verdict: scoring.trustScore >= 0.5 ? "PASS" : "WARN",
+    score: scoring.trustScore,
+    reason: `agreement=${scoring.agreementRatio.toFixed(2)} decision=${finalDecision}`,
+    meta: { trustScore: scoring.trustScore, agreementRatio: scoring.agreementRatio, finalDecision },
+  })
 
   // ── Assemble proof bundle ─────────────────────────────────────────────────
   const bundle: ProofBundle = {

@@ -95,3 +95,37 @@ export async function recordStageEvent(supabase: any, input: StageEventInput) {
     console.error(`Failed to write engine event ${input.stage}:`, err)
   }
 }
+
+// ─── Stage Verdict Writer ─────────────────────────────────────────────────────
+// Writes per-stage gate outcomes to trade_stage_verdicts for T33 analytics.
+// Non-fatal: failure is logged, never throws. Never blocks the trade pipeline.
+
+export type StageVerdictStatus = "PASS" | "FAIL" | "WARN" | "SKIP" | "DEGRADED" | "BLOCKED"
+
+interface StageVerdictParams {
+  runId: string           // = requestId from orchestrator
+  tradeId?: string | null // linked after persist; null during gate stages
+  stage: string           // truthserum | halal | preflight | deliberation | scoring
+  verdict: StageVerdictStatus
+  score?: number | null   // normalized 0–1 where applicable (e.g. trustScore)
+  reason?: string | null
+  meta?: Record<string, unknown>
+}
+
+export async function emitStageVerdict(params: StageVerdictParams): Promise<void> {
+  try {
+    const supabase = await createClient()
+    await supabase.from("trade_stage_verdicts").insert({
+      run_id: params.runId,
+      trade_id: params.tradeId ?? null,
+      stage: params.stage,
+      verdict: params.verdict,
+      score: params.score ?? null,
+      reason: params.reason ?? null,
+      meta: params.meta ?? {},
+    })
+  } catch (error) {
+    // Non-fatal — analytics writes never block the trade pipeline
+    console.error("[trade_stage_verdicts] persist failed:", error)
+  }
+}
