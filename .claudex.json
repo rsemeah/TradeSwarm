@@ -1,0 +1,8 @@
+{
+  "version": "1.1",
+  "bridge_repo": "https://github.com/redlanternstudios/Claudex.git",
+  "bridge_ref": "main",
+  "bridge_file": "OPS/BRIDGE.json",
+  "local_bridge_path": "../../Documents/RedLantern Studios/Claudex/OPS/BRIDGE.json",
+  "product_key": "tradeswarm"
+}
